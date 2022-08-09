@@ -15,6 +15,8 @@ public:
 
 	void destroy();
 
+	inline uint64_t get_handle() const { return m_window_handle; }
+
 private:
 	uint64_t m_window_handle;
 	bool m_closed;

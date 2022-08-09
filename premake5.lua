@@ -1,6 +1,6 @@
 
 workspace "Vulkan rendering"
-	configurations { "Debug", "Release" }
+	configurations { "Debug", "Release", "Distribution"}
 	architecture "x86_64"
 	platforms {"WINDOWS"}
 
@@ -22,7 +22,8 @@ project "sandbox"
 	
 	includedirs {
 		"engine/src",
-		"sandbox/src"
+		"sandbox/src",
+		"$(VULKAN_SDK)/include"
 	}
 
 	links {
@@ -37,6 +38,11 @@ project "sandbox"
 
 	filter "configurations:Release"
 		defines {"RELEASE", "NDEBUG" }
+		optimize "On"
+		staticruntime "Off"
+		
+	filter "configurations:Distribution"
+		defines {"DISTRIBUTION", "NDEBUG" }
 		optimize "On"
 		staticruntime "Off"
 
@@ -56,7 +62,16 @@ project "engine"
 	}
 
 	includedirs {
-		"engine/src"
+		"engine/src",
+		"$(VULKAN_SDK)/include"
+	}
+	libdirs {
+		"$(VULKAN_SDK)/Lib"
+	}
+
+	links {
+		"vulkan-1.lib",
+		"VkLayer_utils.lib"
 	}
 
 	defines {"BUILD_ENGINE"}
@@ -73,3 +88,9 @@ project "engine"
 		defines {"RELEASE", "NDEBUG" }
 		optimize "On"
 		staticruntime "Off"
+		
+	filter "configurations:Distribution"
+		defines {"DISTRIBUTION", "NDEBUG" }
+		optimize "On"
+		staticruntime "Off"
+

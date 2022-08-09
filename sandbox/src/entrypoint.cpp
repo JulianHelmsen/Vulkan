@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <engine/core/window.h>
+#include <engine/engine.h>
 #include <stdio.h>
 
 
@@ -8,10 +8,16 @@ int main(const int argc, const char** argv) {
 
 	window window{"Title", 1020, 720};
 
+	if (!render_api::init()) {
+		window.destroy();
+		return -1;
+	}
+
 	while (!window.is_closed()) {
 		window.wait_events();
 	}
 
+	render_api::shutdown();
 	window.destroy();
 	return 0;
 }
