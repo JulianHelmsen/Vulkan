@@ -1,0 +1,9 @@
+.vs
+engine/obj
+sandbox/obj
+**.vcxproj
+**.vcxproj.user
+**.sln
+**~
+**.swp
+bin
