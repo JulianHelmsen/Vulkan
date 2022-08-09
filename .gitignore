@@ -3,6 +3,7 @@ engine/obj
 sandbox/obj
 **.vcxproj
 **.vcxproj.user
+**.vcxproj.filters
 **.sln
 **~
 **.swp
