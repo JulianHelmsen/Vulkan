@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 
-static bool createVkInstance();
+static bool create_vk_instance();
 static bool select_physical_device(const std::vector<const char*>& extensions);
 static bool create_logical_device(const std::vector<const char*>& extensions);
 static bool create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
@@ -40,7 +40,7 @@ VkBool32 validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 
 
 bool render_api::init(window& window) {
-	if (!createVkInstance())
+	if (!create_vk_instance())
 		return false;
 
 	if (!window.create_surface(s_data.instance))
@@ -351,7 +351,7 @@ static bool check_required_extensions(const std::vector<const char*> required_ex
 
 
 
-bool createVkInstance() {
+bool create_vk_instance() {
 	std::vector<const char*> required_layers = {
 #ifndef DISTRIBUTION
 		"VK_LAYER_KHRONOS_validation"
