@@ -7,6 +7,7 @@
 static bool createVkInstance();
 static bool select_physical_device(const std::vector<const char*>& extensions);
 static bool create_logical_device(const std::vector<const char*>& extensions);
+static bool create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
 
 struct queue_family_indices {
 	int graphics;
@@ -17,6 +18,7 @@ struct queue_family_indices {
 static struct {
 	queue_family_indices queue_families;
 	VkPhysicalDevice physical_device;
+	VkSwapchainKHR swapchain;
 	VkSurfaceKHR surface;
 	VkInstance instance;
 	VkDevice device;
@@ -50,6 +52,9 @@ bool render_api::init(window& window) {
 		return false;
 	if (!create_logical_device(required_extensions))
 		return false;
+
+	if (!create_swapchain())
+		return false;
 	return true;
 }
 
@@ -57,6 +62,7 @@ bool render_api::init(window& window) {
 
 void render_api::shutdown() {
 
+	vkDestroySwapchainKHR(s_data.device, s_data.swapchain, NULL);
 	vkDestroySurfaceKHR(s_data.instance, s_data.surface, NULL);
 	vkDestroyDevice(s_data.device, NULL);
 #ifndef DISTRIBUTION
@@ -70,6 +76,85 @@ void render_api::shutdown() {
 
 #endif
 	vkDestroyInstance(s_data.instance, NULL);
+}
+
+static VkPresentModeKHR select_present_mode(VkPhysicalDevice device, VkSurfaceKHR surface) {
+	uint32_t present_mode_count;
+	// VK_PRESENT_MODE_FIFO_KHR is guaranteed to be supported
+	VkPresentModeKHR selected = VK_PRESENT_MODE_FIFO_KHR;
+	if (vkGetPhysicalDeviceSurfacePresentModesKHR(s_data.physical_device, s_data.surface, &present_mode_count, NULL) != VK_SUCCESS)
+		return selected;
+	VkPresentModeKHR* present_modes = new VkPresentModeKHR[present_mode_count];
+	if (!vkGetPhysicalDeviceSurfacePresentModesKHR(s_data.physical_device, s_data.surface, &present_mode_count, present_modes)) {
+		delete[] present_modes;
+		return selected;
+	}
+
+	for (int i = 0; i < present_mode_count; i++) {
+		// prefer MAILBOX over FIFO
+		if (present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+			selected = VK_PRESENT_MODE_MAILBOX_KHR;
+			break;
+		}
+	}
+	delete[] present_modes;
+	return selected;
+}
+
+static VkSurfaceFormatKHR select_surface_format(VkPhysicalDevice device, VkSurfaceKHR surface) {
+	uint32_t count;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, NULL);
+	VkSurfaceFormatKHR* formats = new VkSurfaceFormatKHR[count];
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, formats);
+
+	VkSurfaceFormatKHR selected = formats[0];
+	VkSurfaceFormatKHR preferred = { VK_FORMAT_B8G8R8A8_SRGB , VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	
+	for (uint32_t i = 0; i < count; i++) {
+		if (formats[i].colorSpace == preferred.colorSpace && formats[i].format == preferred.format) {
+			selected = preferred;
+			break;
+		}
+	}
+
+	delete[] formats;
+	return selected;
+}
+
+bool create_swapchain(VkSwapchainKHR old_swapchain) {
+	
+	VkSurfaceCapabilitiesKHR capabilities;
+	if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(s_data.physical_device, s_data.surface, &capabilities) != VK_SUCCESS)
+		return false;
+	VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	if (!(capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR))
+		return false;
+
+	VkSurfaceFormatKHR surface_format = select_surface_format(s_data.physical_device, s_data.surface);
+
+	VkSwapchainCreateInfoKHR swapchain_create_info = { };
+	swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchain_create_info.pNext = NULL;
+	swapchain_create_info.flags = 0;
+	swapchain_create_info.surface = s_data.surface;
+	swapchain_create_info.minImageCount = capabilities.minImageCount;
+	swapchain_create_info.presentMode = select_present_mode(s_data.physical_device, s_data.surface);
+	swapchain_create_info.imageFormat = surface_format.format;
+	swapchain_create_info.imageColorSpace = surface_format.colorSpace;
+	swapchain_create_info.imageExtent = capabilities.currentExtent;
+	swapchain_create_info.imageArrayLayers = 1;
+	swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchain_create_info.queueFamilyIndexCount = 1;
+	swapchain_create_info.pQueueFamilyIndices = (const uint32_t*) &s_data.queue_families.graphics;
+	swapchain_create_info.preTransform = transform;
+	swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchain_create_info.clipped = VK_TRUE;
+
+	
+	
+
+	return vkCreateSwapchainKHR(s_data.device, &swapchain_create_info, NULL, &s_data.swapchain) == VK_SUCCESS;
 }
 
 bool create_logical_device(const std::vector<const char*>& extensions) {
