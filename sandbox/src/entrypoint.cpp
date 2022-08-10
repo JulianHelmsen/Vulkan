@@ -13,7 +13,7 @@ int main(const int argc, const char** argv) {
 		return -1;
 	}
 
-	while (!window.is_closed()) {
+	while (!window.is_closed_requsted()) {
 		window.wait_events();
 	}
 

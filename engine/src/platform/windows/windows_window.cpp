@@ -1,5 +1,6 @@
 #include "engine/core/window.h"
 #include <Windows.h>
+#include <stdio.h>
 
 namespace utils {
 	void convert_to_wstring(LPWSTR buffer, size_t elem_count, const char* source) {
@@ -12,19 +13,33 @@ namespace utils {
 }
 LRESULT EventWindowProc(_In_ HWND hWnd, _In_ UINT msg, _In_ WPARAM wParam, _In_ LPARAM lParam) {
 	window* owner = (window*) GetWindowLongPtrW(hWnd, GWLP_USERDATA);
+	
 	switch (msg) {
 	case WM_CLOSE:
-		owner->destroy();
+		on_window_close_requested(owner);
 		break;
 	case WM_DESTROY:
 		break;
-
+	case WM_SIZE:
+		on_window_resize(owner, LOWORD(lParam), HIWORD(lParam));
+		break;
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+void on_window_close_requested(window* window) {
+	window->m_close_requested = true;
+}
+
+void on_window_resize(window* window, int new_width, int new_height) {
+	window->m_width = new_width;
+	window->m_height = new_height;
+}
+
+
+
 LRESULT InitialWindowProc(_In_ HWND hWnd, _In_ UINT Msg, _In_ WPARAM wParam, _In_ LPARAM lParam) {
-	
+
 	if (Msg == WM_CREATE) {
 		LPCREATESTRUCT create = (LPCREATESTRUCT)lParam;
 		SetWindowLongPtrW(hWnd, GWLP_WNDPROC, (LONG_PTR)EventWindowProc);
@@ -34,7 +49,8 @@ LRESULT InitialWindowProc(_In_ HWND hWnd, _In_ UINT Msg, _In_ WPARAM wParam, _In
 	return DefWindowProc(hWnd, Msg, wParam, lParam);
 }
 
-window::window(const char* title, int width, int height) : m_window_handle(0), m_closed(false) {
+
+window::window(const char* title, int width, int height) : m_window_handle(0), m_close_requested(false), m_closed(false) {
 
 	WNDCLASSEX cls = { 0 };
 	cls.cbSize = sizeof(cls);
@@ -51,9 +67,10 @@ window::window(const char* title, int width, int height) : m_window_handle(0), m
 		m_closed = true;
 		return;
 	}
-	m_window_handle = (uint64_t)window_handle;
+	m_window_handle = (window_handle_t)window_handle;
 	ShowWindow(window_handle, SW_SHOW);
 }
+
 
 void window::poll_events() {
 	MSG msg = {};

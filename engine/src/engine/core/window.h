@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+typedef uint64_t window_handle_t;
+
 class window {
 public:
 	window(const char* title, int width, int height);
@@ -12,14 +14,28 @@ public:
 	void wait_events();
 
 	inline bool is_closed() const { return m_closed; }
+	inline bool is_closed_requsted() const { return m_close_requested; }
 
 	void destroy();
 
-	inline uint64_t get_handle() const { return m_window_handle; }
+	inline window_handle_t get_handle() const { return m_window_handle; }
+
+	int get_width() const { return m_width; };
+	int get_height() const { return m_height; };
+
+
 
 private:
-	uint64_t m_window_handle;
+
+	int m_width;
+	int m_height;
+
+	window_handle_t m_window_handle;
+	bool m_close_requested;
 	bool m_closed;
+
+	friend void on_window_close_requested(window* window);
+	friend void on_window_resize(window* window, int new_width, int new_height);
 };
 
 
