@@ -1,6 +1,7 @@
 #include "engine/core/window.h"
 #include <Windows.h>
 #include <stdio.h>
+#include <vulkan/vulkan_win32.h>
 
 namespace utils {
 	void convert_to_wstring(LPWSTR buffer, size_t elem_count, const char* source) {
@@ -50,7 +51,7 @@ LRESULT InitialWindowProc(_In_ HWND hWnd, _In_ UINT Msg, _In_ WPARAM wParam, _In
 }
 
 
-window::window(const char* title, int width, int height) : m_window_handle(0), m_close_requested(false), m_closed(false) {
+window::window(const char* title, int width, int height) : m_window_handle(0), m_close_requested(false), m_closed(false), m_surface(VK_NULL_HANDLE) {
 
 	WNDCLASSEX cls = { 0 };
 	cls.cbSize = sizeof(cls);
@@ -71,6 +72,15 @@ window::window(const char* title, int width, int height) : m_window_handle(0), m
 	ShowWindow(window_handle, SW_SHOW);
 }
 
+bool window::create_surface(VkInstance instance) {
+	VkWin32SurfaceCreateInfoKHR info{};
+	info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	info.pNext = NULL;
+	info.flags = 0;
+	info.hinstance = GetModuleHandle(NULL);
+	info.hwnd = (HWND)m_window_handle;
+	return vkCreateWin32SurfaceKHR(instance, &info, NULL, &m_surface) == VK_SUCCESS;
+}
 
 void window::poll_events() {
 	MSG msg = {};

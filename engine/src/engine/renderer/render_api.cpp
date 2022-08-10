@@ -17,6 +17,7 @@ struct queue_family_indices {
 static struct {
 	queue_family_indices queue_families;
 	VkPhysicalDevice physical_device;
+	VkSurfaceKHR surface;
 	VkInstance instance;
 	VkDevice device;
 	VkDebugUtilsMessengerEXT debug_messenger;
@@ -36,16 +37,39 @@ VkBool32 validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 }
 
 
-bool render_api::init() {
+bool render_api::init(window& window) {
 	if (!createVkInstance())
 		return false;
 
-	std::vector<const char*> required_extensions = { "VK_KHR_swapchain"};
+	if (!window.create_surface(s_data.instance))
+		return false;
+	s_data.surface = window.get_surface();
+
+	std::vector<const char*> required_extensions = { "VK_KHR_swapchain" };
 	if (!select_physical_device(required_extensions))
 		return false;
 	if (!create_logical_device(required_extensions))
 		return false;
 	return true;
+}
+
+
+
+void render_api::shutdown() {
+
+	vkDestroySurfaceKHR(s_data.instance, s_data.surface, NULL);
+	vkDestroyDevice(s_data.device, NULL);
+#ifndef DISTRIBUTION
+	// delete debug validation layers
+	if (s_data.debug_messenger) {
+		PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_data.instance, "vkDestroyDebugUtilsMessengerEXT");
+		if (vkDestroyDebugUtilsMessengerEXT) {
+			vkDestroyDebugUtilsMessengerEXT(s_data.instance, s_data.debug_messenger, NULL);
+		}
+	}
+
+#endif
+	vkDestroyInstance(s_data.instance, NULL);
 }
 
 bool create_logical_device(const std::vector<const char*>& extensions) {
@@ -149,8 +173,10 @@ bool select_physical_device(const std::vector<const char*>& extensions) {
 		for (uint32_t f = 0; f < family_count; f++) {
 			VkQueueFlags flags = queue_families[f].queueFlags;
 			if (flags & VK_QUEUE_GRAPHICS_BIT) {
-				current.graphics = f;
-				// if(vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], f, ))
+				VkBool32 supports_surface;
+				vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], f, s_data.surface, &supports_surface);
+				if(supports_surface)
+					current.graphics = f;
 			}
 			if (flags == VK_QUEUE_TRANSFER_BIT) {
 				current.dedicated_transfer = true;
@@ -162,7 +188,7 @@ bool select_physical_device(const std::vector<const char*>& extensions) {
 
 
 		if (current.graphics != -1 && current.transfer != -1) {
-			if (best.graphics == -1 || best.dedicated_transfer) {
+			if (best.graphics == -1 || best.dedicated_transfer || properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
 				best = current;
 				pick = devices[i];
 			}
@@ -248,6 +274,9 @@ bool createVkInstance() {
 	};
 	std::vector<const char*> required_extensions = {
 		VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef PLATFORM_WINDOWS
+		"VK_KHR_win32_surface",
+#endif
 #ifndef DISTRIBUTION
 		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 #endif 
@@ -303,22 +332,6 @@ bool createVkInstance() {
 	return true;
 }
 
-
-void render_api::shutdown() {
-
-	vkDestroyDevice(s_data.device, NULL);
-#ifndef DISTRIBUTION
-	// delete debug validation layers
-	if(s_data.debug_messenger) {
-		PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(s_data.instance, "vkDestroyDebugUtilsMessengerEXT");
-		if (vkDestroyDebugUtilsMessengerEXT) {
-			vkDestroyDebugUtilsMessengerEXT(s_data.instance, s_data.debug_messenger, NULL);
-		}
-	}
-
-#endif
-	vkDestroyInstance(s_data.instance, NULL);
-}
 
 const VkInstance& render_api::get_instance() {
 	return s_data.instance;

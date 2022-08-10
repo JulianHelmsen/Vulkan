@@ -8,10 +8,11 @@ int main(const int argc, const char** argv) {
 
 	window window{"Title", 1020, 720};
 
-	if (!render_api::init()) {
+	if (!render_api::init(window)) {
 		window.destroy();
 		return -1;
 	}
+
 
 	while (!window.is_closed_requsted()) {
 		window.wait_events();
