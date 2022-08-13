@@ -7,6 +7,9 @@
 
 
 #include "renderer/render_api.h"
+#include "renderer/renderpass.h"
+#include "renderer/pipeline.h"
+#include "renderer/shader.h"
 
 
 #endif //ENGINE_ENGINE_H

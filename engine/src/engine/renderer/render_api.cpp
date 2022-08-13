@@ -7,7 +7,7 @@
 static bool create_vk_instance();
 static bool select_physical_device(const std::vector<const char*>& extensions);
 static bool create_logical_device(const std::vector<const char*>& extensions);
-static bool create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
+static VkSwapchainKHR create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
 
 struct queue_family_indices {
 	int graphics;
@@ -23,6 +23,8 @@ static struct {
 	VkInstance instance;
 	VkDevice device;
 	VkDebugUtilsMessengerEXT debug_messenger;
+	VkSurfaceFormatKHR selected_surface_format;
+	
 
 	VkQueue transfer_queue;
 	VkQueue graphics_queue;
@@ -53,8 +55,10 @@ bool render_api::init(window& window) {
 	if (!create_logical_device(required_extensions))
 		return false;
 
-	if (!create_swapchain())
+	VkSwapchainKHR created_swapchain = create_swapchain();
+	if (created_swapchain == VK_NULL_HANDLE)
 		return false;
+	s_data.swapchain = created_swapchain;
 	return true;
 }
 
@@ -62,6 +66,7 @@ bool render_api::init(window& window) {
 
 void render_api::shutdown() {
 
+	// vkDestroyRenderPass(s_data.device, s_data.render_pass, NULL);
 	vkDestroySwapchainKHR(s_data.device, s_data.swapchain, NULL);
 	vkDestroySurfaceKHR(s_data.instance, s_data.surface, NULL);
 	vkDestroyDevice(s_data.device, NULL);
@@ -90,7 +95,7 @@ static VkPresentModeKHR select_present_mode(VkPhysicalDevice device, VkSurfaceKH
 		return selected;
 	}
 
-	for (int i = 0; i < present_mode_count; i++) {
+	for (uint32_t i = 0; i < present_mode_count; i++) {
 		// prefer MAILBOX over FIFO
 		if (present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
 			selected = VK_PRESENT_MODE_MAILBOX_KHR;
@@ -121,16 +126,16 @@ static VkSurfaceFormatKHR select_surface_format(VkPhysicalDevice device, VkSurfa
 	return selected;
 }
 
-bool create_swapchain(VkSwapchainKHR old_swapchain) {
+VkSwapchainKHR create_swapchain(VkSwapchainKHR old_swapchain) {
 	
 	VkSurfaceCapabilitiesKHR capabilities;
 	if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(s_data.physical_device, s_data.surface, &capabilities) != VK_SUCCESS)
-		return false;
+		return VK_NULL_HANDLE;
 	VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	if (!(capabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR))
-		return false;
+		return VK_NULL_HANDLE;
 
-	VkSurfaceFormatKHR surface_format = select_surface_format(s_data.physical_device, s_data.surface);
+	s_data.selected_surface_format = select_surface_format(s_data.physical_device, s_data.surface);
 
 	VkSwapchainCreateInfoKHR swapchain_create_info = { };
 	swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -139,8 +144,8 @@ bool create_swapchain(VkSwapchainKHR old_swapchain) {
 	swapchain_create_info.surface = s_data.surface;
 	swapchain_create_info.minImageCount = capabilities.minImageCount;
 	swapchain_create_info.presentMode = select_present_mode(s_data.physical_device, s_data.surface);
-	swapchain_create_info.imageFormat = surface_format.format;
-	swapchain_create_info.imageColorSpace = surface_format.colorSpace;
+	swapchain_create_info.imageFormat = s_data.selected_surface_format.format;
+	swapchain_create_info.imageColorSpace = s_data.selected_surface_format.colorSpace;
 	swapchain_create_info.imageExtent = capabilities.currentExtent;
 	swapchain_create_info.imageArrayLayers = 1;
 	swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -153,8 +158,10 @@ bool create_swapchain(VkSwapchainKHR old_swapchain) {
 
 	
 	
-
-	return vkCreateSwapchainKHR(s_data.device, &swapchain_create_info, NULL, &s_data.swapchain) == VK_SUCCESS;
+	VkSwapchainKHR swapchain;
+	if (vkCreateSwapchainKHR(s_data.device, &swapchain_create_info, NULL, &swapchain) == VK_SUCCESS)
+		return swapchain;
+	return VK_NULL_HANDLE;
 }
 
 bool create_logical_device(const std::vector<const char*>& extensions) {
@@ -418,6 +425,38 @@ bool create_vk_instance() {
 }
 
 
-const VkInstance& render_api::get_instance() {
+VkInstance render_api::get_instance() {
 	return s_data.instance;
+}
+
+
+VkDevice render_api::get_device() {
+	return s_data.device;
+}
+
+VkQueue render_api::get_transfer_queue() {
+	return s_data.transfer_queue;
+}
+
+VkQueue render_api::get_graphics_queue() {
+	return s_data.graphics_queue;
+}
+
+
+void render_api::recreate_swapchain() {
+	VkSwapchainKHR new_swapchain = create_swapchain(s_data.swapchain);
+	if (s_data.swapchain != VK_NULL_HANDLE)
+		vkDestroySwapchainKHR(s_data.device, s_data.swapchain, NULL);
+	s_data.swapchain = new_swapchain;
+
+}
+
+
+VkSurfaceFormatKHR render_api::get_surface_format() {
+	return s_data.selected_surface_format;
+}
+
+
+uint32_t render_api::get_graphics_queue_familily() {
+	return s_data.queue_families.graphics;
 }

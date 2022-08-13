@@ -9,10 +9,15 @@ public:
 	static bool init(window& window);
 	static void shutdown();
 
+	static void recreate_swapchain();
 
-	static const VkInstance& get_instance();
-private:
-	static VkSurfaceKHR create_surface(window_handle_t handle);
+
+	static VkSurfaceFormatKHR get_surface_format();
+	static VkInstance get_instance();
+	static VkDevice get_device();
+	static VkQueue get_transfer_queue();
+	static VkQueue get_graphics_queue();
+	static uint32_t get_graphics_queue_familily();
 };
 
 #endif //ENGINE_RENDERER_RENDER_API_H
