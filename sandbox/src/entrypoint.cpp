@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <engine/engine.h>
 #include <stdio.h>
+#include <assert.h>
 
 
 
@@ -33,6 +34,14 @@ int main(const int argc, const char** argv) {
 	vkDestroyShaderModule(render_api::get_device(), vertex, NULL);
 	vkDestroyShaderModule(render_api::get_device(), fragment, NULL);
 
+	framebuffer framebuffers[2];
+	for (int i = 0; i < sizeof(framebuffers) / sizeof(framebuffers[0]); i++) {
+		if (!framebuffers[i].add_color_attachment(render_api::get_swapchain_image(i), render_api::get_surface_format().format))
+			return -1;
+		if (!framebuffers[i].create(render_pass, window.get_width(), window.get_height()))
+			return -1;
+	}
+
 
 
 	while (!window.is_closed_requsted()) {
@@ -41,6 +50,8 @@ int main(const int argc, const char** argv) {
 
 
 
+	for(int i = 0; i < sizeof(framebuffers) / sizeof(framebuffers[0]); i++)
+		framebuffers[i].destroy();
 	vkDestroyPipeline(render_api::get_device(), pipeline, NULL);
 	vkDestroyRenderPass(render_api::get_device(), render_pass, NULL);
 	render_api::shutdown();

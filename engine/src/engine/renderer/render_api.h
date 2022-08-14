@@ -18,6 +18,10 @@ public:
 	static VkQueue get_transfer_queue();
 	static VkQueue get_graphics_queue();
 	static uint32_t get_graphics_queue_familily();
+
+	static uint32_t get_swapchain_image_count();
+	static VkImage get_swapchain_image(uint32_t index);
+
 };
 
 #endif //ENGINE_RENDERER_RENDER_API_H

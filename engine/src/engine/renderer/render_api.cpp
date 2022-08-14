@@ -93,7 +93,7 @@ bool get_swapchain_images() {
 	if (vkGetSwapchainImagesKHR(s_data.device, s_data.swapchain, &s_data.swapchain_image_count, NULL) != VK_SUCCESS)
 		return false;
 	s_data.swapchain_images = new VkImage[s_data.swapchain_image_count];
-	if (vkGetSwapchainImagesKHR(s_data.device, s_data.swapchain, &s_data.swapchain_image_count, NULL) != VK_SUCCESS) {
+	if (vkGetSwapchainImagesKHR(s_data.device, s_data.swapchain, &s_data.swapchain_image_count, s_data.swapchain_images) != VK_SUCCESS) {
 		delete[] s_data.swapchain_images;
 		return false;
 	}
@@ -476,4 +476,12 @@ VkSurfaceFormatKHR render_api::get_surface_format() {
 
 uint32_t render_api::get_graphics_queue_familily() {
 	return s_data.queue_families.graphics;
+}
+
+
+uint32_t render_api::get_swapchain_image_count() {
+	return s_data.swapchain_image_count;
+}
+VkImage render_api::get_swapchain_image(uint32_t index) {
+	return s_data.swapchain_images[index];
 }

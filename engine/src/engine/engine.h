@@ -10,6 +10,7 @@
 #include "renderer/renderpass.h"
 #include "renderer/pipeline.h"
 #include "renderer/shader.h"
+#include "renderer/framebuffer.h"
 
 
 #endif //ENGINE_ENGINE_H
