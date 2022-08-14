@@ -8,6 +8,7 @@ static bool create_vk_instance();
 static bool select_physical_device(const std::vector<const char*>& extensions);
 static bool create_logical_device(const std::vector<const char*>& extensions);
 static VkSwapchainKHR create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
+static bool get_swapchain_images();
 
 struct queue_family_indices {
 	int graphics;
@@ -25,6 +26,8 @@ static struct {
 	VkDebugUtilsMessengerEXT debug_messenger;
 	VkSurfaceFormatKHR selected_surface_format;
 	
+	uint32_t swapchain_image_count;
+	VkImage* swapchain_images;
 
 	VkQueue transfer_queue;
 	VkQueue graphics_queue;
@@ -59,6 +62,8 @@ bool render_api::init(window& window) {
 	if (created_swapchain == VK_NULL_HANDLE)
 		return false;
 	s_data.swapchain = created_swapchain;
+	if (!get_swapchain_images())
+		return false;
 	return true;
 }
 
@@ -81,6 +86,18 @@ void render_api::shutdown() {
 
 #endif
 	vkDestroyInstance(s_data.instance, NULL);
+}
+
+
+bool get_swapchain_images() {
+	if (vkGetSwapchainImagesKHR(s_data.device, s_data.swapchain, &s_data.swapchain_image_count, NULL) != VK_SUCCESS)
+		return false;
+	s_data.swapchain_images = new VkImage[s_data.swapchain_image_count];
+	if (vkGetSwapchainImagesKHR(s_data.device, s_data.swapchain, &s_data.swapchain_image_count, NULL) != VK_SUCCESS) {
+		delete[] s_data.swapchain_images;
+		return false;
+	}
+	return true;
 }
 
 static VkPresentModeKHR select_present_mode(VkPhysicalDevice device, VkSurfaceKHR surface) {
