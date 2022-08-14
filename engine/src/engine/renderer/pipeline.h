@@ -8,7 +8,7 @@
 class pipeline_builder {
 public:
 	pipeline_builder(VkRenderPass render_pass) 
-		: m_render_pass(render_pass), m_buffer_layout_stride(0), m_culling_enabled(VK_FALSE), m_depth_test(VK_FALSE), m_stencil_test(VK_FALSE), m_blending(VK_FALSE) {
+		: m_render_pass(render_pass), m_buffer_layout_stride(0), m_culling_enabled(VK_FALSE), m_depth_test(VK_FALSE), m_stencil_test(VK_FALSE), m_blending(VK_FALSE), m_samples(1) {
 	}
 
 	VkPipeline build();

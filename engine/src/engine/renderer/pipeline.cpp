@@ -107,13 +107,14 @@ VkPipeline pipeline_builder::build() {
 	viewport_state.viewportCount = 1;
 	viewport_state.scissorCount = 1;
 	viewport_state.pViewports = &m_viewport;
+	viewport_state.pScissors = &scissors;
 
 	VkPipelineRasterizationStateCreateInfo rasterizer_state_create_info = { };
 	rasterizer_state_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer_state_create_info.pNext = NULL;
 	rasterizer_state_create_info.flags = 0;
 	rasterizer_state_create_info.depthBiasClamp = VK_FALSE; // if true it clamps the depth of each fragment between the viewports min and max depth
-	rasterizer_state_create_info.rasterizerDiscardEnable = VK_TRUE;
+	rasterizer_state_create_info.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer_state_create_info.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer_state_create_info.cullMode = m_culling_enabled;
 	rasterizer_state_create_info.lineWidth = 1.0f;
@@ -146,12 +147,13 @@ VkPipeline pipeline_builder::build() {
 	depth_stencil_create_info.stencilTestEnable = m_stencil_test;
 
 	VkPipelineColorBlendAttachmentState attachment_blending = {};
+	attachment_blending.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	attachment_blending.blendEnable = m_blending;
 	attachment_blending.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
 	attachment_blending.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
 	attachment_blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	attachment_blending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	attachment_blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	attachment_blending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	attachment_blending.alphaBlendOp = VK_BLEND_OP_ADD;
 	attachment_blending.colorBlendOp = VK_BLEND_OP_ADD;
 
@@ -164,7 +166,7 @@ VkPipeline pipeline_builder::build() {
 	color_blend_state.attachmentCount = 1;
 	color_blend_state.pAttachments = &attachment_blending;
 	for(int i = 0; i < 4; i++)
-		color_blend_state.blendConstants[i] = 1.0f;
+		color_blend_state.blendConstants[i] = 0.0f;
 
 	VkPipelineLayoutCreateInfo layout_create_info = { };
 	layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -175,6 +177,14 @@ VkPipeline pipeline_builder::build() {
 	layout_create_info.pushConstantRangeCount = 0;
 	layout_create_info.pPushConstantRanges = NULL;
 
+	VkPipelineDynamicStateCreateInfo dynamic_state = {};
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.pNext = NULL;
+	dynamic_state.flags = 0;
+	VkDynamicState states[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	dynamic_state.pDynamicStates = states;
+	dynamic_state.dynamicStateCount = (uint32_t)sizeof(states) / sizeof(states[0]);
+
 	
 	VkPipelineLayout layout;
 	VkResult layout_result = vkCreatePipelineLayout(render_api::get_device(), &layout_create_info, NULL, &layout);
@@ -182,6 +192,8 @@ VkPipeline pipeline_builder::build() {
 		result = layout_result;
 		goto return_label;
 	}
+
+
 
 
 	// deriving will make creating and switching between pipelines slightly faster
@@ -199,7 +211,7 @@ VkPipeline pipeline_builder::build() {
 	create_info.pMultisampleState = &multi_sample_state_create_info;
 	create_info.pDepthStencilState = &depth_stencil_create_info;
 	create_info.pColorBlendState = &color_blend_state;
-	create_info.pDynamicState = NULL;
+	create_info.pDynamicState = &dynamic_state;
 	create_info.layout = layout;
 
 	// do not derive for now

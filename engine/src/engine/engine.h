@@ -12,6 +12,9 @@
 #include "renderer/shader.h"
 #include "renderer/framebuffer.h"
 #include "renderer/command_buffer.h"
+#include "renderer/synchronization.h"
 
+
+#define stack_array_len(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #endif //ENGINE_ENGINE_H

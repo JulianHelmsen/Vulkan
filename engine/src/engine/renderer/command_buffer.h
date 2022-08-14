@@ -13,7 +13,8 @@ public:
 
 	void destroy();
 
-	inline VkCommandBuffer get_handle() const { return m_handle; }
+	inline const VkCommandBuffer& get_handle() const { return m_handle; }
+	inline VkCommandBuffer& get_handle() { return m_handle; }
 private:
 	VkCommandBuffer m_handle;
 };

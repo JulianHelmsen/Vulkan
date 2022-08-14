@@ -3,11 +3,13 @@
 
 #include <stdint.h>
 #include <vulkan/vulkan.h>
+#include <functional>
 
 typedef uint64_t window_handle_t;
 
 class window {
 public:
+	using resize_event_handler = std::function<void(int, int)>;
 	window(const char* title, int width, int height);
 
 	void poll_events();
@@ -28,6 +30,8 @@ public:
 	inline VkSurfaceKHR get_surface() const { return m_surface; }
 
 	bool create_surface(VkInstance instance);
+
+	void on_resize(resize_event_handler handler) { m_resize_handler = handler; }
 private:
 
 	int m_width;
@@ -39,6 +43,8 @@ private:
 	bool m_close_requested;
 	bool m_closed;
 
+
+	resize_event_handler m_resize_handler;
 	friend void on_window_close_requested(window* window);
 	friend void on_window_resize(window* window, int new_width, int new_height);
 };

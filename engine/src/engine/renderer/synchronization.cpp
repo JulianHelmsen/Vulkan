@@ -29,3 +29,8 @@ VkFence create_fence() {
 	assert(res == VK_SUCCESS);
 	return fence;
 }
+
+
+VkResult waitFence(VkFence fence, uint64_t timeout) {
+	return vkWaitForFences(render_api::get_device(), 1, &fence, VK_TRUE, timeout);
+}

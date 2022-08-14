@@ -20,7 +20,7 @@ struct queue_family_indices {
 static struct {
 	queue_family_indices queue_families;
 	VkPhysicalDevice physical_device;
-	VkSwapchainKHR swapchain;
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 	VkSurfaceKHR surface;
 	VkInstance instance;
 	VkDevice device;
@@ -29,6 +29,8 @@ static struct {
 	
 	uint32_t swapchain_image_count;
 	VkImage* swapchain_images;
+
+	VkExtent2D swapchain_extent;
 
 
 	VkCommandPool command_pool;
@@ -148,7 +150,7 @@ static VkSurfaceFormatKHR select_surface_format(VkPhysicalDevice device, VkSurfa
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, formats);
 
 	VkSurfaceFormatKHR selected = formats[0];
-	VkSurfaceFormatKHR preferred = { VK_FORMAT_B8G8R8A8_SRGB , VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	VkSurfaceFormatKHR preferred = { VK_FORMAT_R8G8B8A8_UNORM , VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 	
 	for (uint32_t i = 0; i < count; i++) {
 		if (formats[i].colorSpace == preferred.colorSpace && formats[i].format == preferred.format) {
@@ -190,8 +192,11 @@ VkSwapchainKHR create_swapchain(VkSwapchainKHR old_swapchain) {
 	swapchain_create_info.preTransform = transform;
 	swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchain_create_info.clipped = VK_TRUE;
+	swapchain_create_info.oldSwapchain = old_swapchain;
 
-	
+	s_data.swapchain_extent = capabilities.currentExtent;
+
+	printf("capabilities::currentExtent: %dx%d\n", capabilities.currentExtent.width, capabilities.currentExtent.height);
 	
 	VkSwapchainKHR swapchain;
 	if (vkCreateSwapchainKHR(s_data.device, &swapchain_create_info, NULL, &swapchain) == VK_SUCCESS)
@@ -484,6 +489,8 @@ void render_api::recreate_swapchain() {
 		vkDestroySwapchainKHR(s_data.device, s_data.swapchain, NULL);
 	s_data.swapchain = new_swapchain;
 
+
+
 }
 
 
@@ -507,4 +514,13 @@ VkImage render_api::get_swapchain_image(uint32_t index) {
 
 VkCommandPool render_api::get_command_pool() {
 	return s_data.command_pool;
+}
+
+
+const VkSwapchainKHR& render_api::get_swapchain() {
+	return s_data.swapchain;
+}
+
+VkExtent2D render_api::get_swapchain_extent() {
+	return s_data.swapchain_extent;
 }

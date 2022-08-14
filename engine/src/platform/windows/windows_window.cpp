@@ -35,6 +35,8 @@ void on_window_close_requested(window* window) {
 void on_window_resize(window* window, int new_width, int new_height) {
 	window->m_width = new_width;
 	window->m_height = new_height;
+	if(window->m_resize_handler)
+		window->m_resize_handler(new_width, new_height);
 }
 
 

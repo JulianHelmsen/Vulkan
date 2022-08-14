@@ -48,6 +48,14 @@ VkRenderPass render_pass_builder::build() {
 	color_attachment_ref.attachment = 0;
 	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dependencyFlags = 0;
 
 
 	VkRenderPassCreateInfo create_info = { };
@@ -58,8 +66,8 @@ VkRenderPass render_pass_builder::build() {
 	create_info.pAttachments = m_attachments.data();
 	create_info.subpassCount = (uint32_t)m_subpasses.size();
 	create_info.pSubpasses = m_subpasses.data();
-	create_info.dependencyCount = 0;
-	create_info.pDependencies = NULL;
+	create_info.dependencyCount = 1;
+	create_info.pDependencies = &dependency;
 
 
 	VkRenderPass render_pass;

@@ -25,6 +25,9 @@ public:
 
 	static VkCommandPool get_command_pool();
 
+	static const VkSwapchainKHR& get_swapchain();
+	static VkExtent2D get_swapchain_extent();
+
 };
 
 #endif //ENGINE_RENDERER_RENDER_API_H
