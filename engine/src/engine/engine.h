@@ -11,6 +11,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/shader.h"
 #include "renderer/framebuffer.h"
+#include "renderer/command_buffer.h"
 
 
 #endif //ENGINE_ENGINE_H

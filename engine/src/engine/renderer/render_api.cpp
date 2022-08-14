@@ -9,6 +9,7 @@ static bool select_physical_device(const std::vector<const char*>& extensions);
 static bool create_logical_device(const std::vector<const char*>& extensions);
 static VkSwapchainKHR create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE);
 static bool get_swapchain_images();
+static bool create_command_pool();
 
 struct queue_family_indices {
 	int graphics;
@@ -28,6 +29,9 @@ static struct {
 	
 	uint32_t swapchain_image_count;
 	VkImage* swapchain_images;
+
+
+	VkCommandPool command_pool;
 
 	VkQueue transfer_queue;
 	VkQueue graphics_queue;
@@ -64,6 +68,8 @@ bool render_api::init(window& window) {
 	s_data.swapchain = created_swapchain;
 	if (!get_swapchain_images())
 		return false;
+	if (!create_command_pool())
+		return false;
 	return true;
 }
 
@@ -71,7 +77,7 @@ bool render_api::init(window& window) {
 
 void render_api::shutdown() {
 
-	// vkDestroyRenderPass(s_data.device, s_data.render_pass, NULL);
+	vkDestroyCommandPool(s_data.device, s_data.command_pool, NULL);
 	vkDestroySwapchainKHR(s_data.device, s_data.swapchain, NULL);
 	vkDestroySurfaceKHR(s_data.instance, s_data.surface, NULL);
 	vkDestroyDevice(s_data.device, NULL);
@@ -86,6 +92,18 @@ void render_api::shutdown() {
 
 #endif
 	vkDestroyInstance(s_data.instance, NULL);
+}
+
+
+
+bool create_command_pool() {
+	VkCommandPoolCreateInfo create_info = { };
+	create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	create_info.pNext = NULL;
+	create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	create_info.queueFamilyIndex = s_data.queue_families.graphics;
+
+	return vkCreateCommandPool(s_data.device, &create_info, NULL, &s_data.command_pool) == VK_SUCCESS;
 }
 
 
@@ -484,4 +502,9 @@ uint32_t render_api::get_swapchain_image_count() {
 }
 VkImage render_api::get_swapchain_image(uint32_t index) {
 	return s_data.swapchain_images[index];
+}
+
+
+VkCommandPool render_api::get_command_pool() {
+	return s_data.command_pool;
 }

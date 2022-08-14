@@ -22,6 +22,9 @@ public:
 	static uint32_t get_swapchain_image_count();
 	static VkImage get_swapchain_image(uint32_t index);
 
+
+	static VkCommandPool get_command_pool();
+
 };
 
 #endif //ENGINE_RENDERER_RENDER_API_H

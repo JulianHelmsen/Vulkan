@@ -42,6 +42,11 @@ int main(const int argc, const char** argv) {
 			return -1;
 	}
 
+	command_buffer cmd_buffer{};
+	cmd_buffer.start();
+	
+	cmd_buffer.end();
+
 
 
 	while (!window.is_closed_requsted()) {
@@ -49,7 +54,7 @@ int main(const int argc, const char** argv) {
 	}
 
 
-
+	cmd_buffer.destroy();
 	for(int i = 0; i < sizeof(framebuffers) / sizeof(framebuffers[0]); i++)
 		framebuffers[i].destroy();
 	vkDestroyPipeline(render_api::get_device(), pipeline, NULL);
