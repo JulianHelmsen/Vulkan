@@ -74,13 +74,14 @@ VkDeviceMemory memory::allocate_device_visible(size_t size, uint32_t memory_type
 	return memory;
 }
 
-void memory::memcpy_host_to_device(VkDeviceMemory memory, const void* data, size_t size) {
+bool memory::memcpy_host_to_device(VkDeviceMemory memory, const void* data, size_t size) {
 	VkDeviceSize d_size = size;
 	if (size % s_info.nonCoherentAtomSize)
 		d_size = VK_WHOLE_SIZE;
 
 	void* mapped;
-	vkMapMemory(context::get_device(), memory, 0, d_size, 0, &mapped);
+	if (vkMapMemory(context::get_device(), memory, 0, d_size, 0, &mapped) != VK_SUCCESS)
+		return false;
 	memcpy(mapped, data, size);
 	VkMappedMemoryRange range;
 	range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -89,47 +90,92 @@ void memory::memcpy_host_to_device(VkDeviceMemory memory, const void* data, size
 	range.offset = 0;
 	range.size = d_size;
 
-	VkResult res = vkFlushMappedMemoryRanges(context::get_device(), 1, &range);
+	if (vkFlushMappedMemoryRanges(context::get_device(), 1, &range) != VK_SUCCESS)
+		return false;
 
 
 	vkUnmapMemory(context::get_device(), memory);
+	return true;
 }
 
 void memory::free(VkDeviceMemory memory) {
 	vkFreeMemory(context::get_device(), memory, NULL);
 }
 
-std::shared_ptr<vertex_buffer> vertex_buffer::create(const void* data, size_t size) {
-	std::shared_ptr<vertex_buffer> buffer = std::make_shared<vertex_buffer>();
+struct create_buffer_out {
+	VkDeviceMemory* memory;
+	VkMemoryRequirements* requirements;
+};
+
+static VkBuffer create_buffer(create_buffer_out& out, const void* data, size_t size, VkBufferUsageFlagBits usage) {
 	VkBufferCreateInfo create_info = { };
 	create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	create_info.pNext = NULL;
 	create_info.flags = 0;
 	create_info.size = size;
-	create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	create_info.usage = usage;
 	create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_info.queueFamilyIndexCount = 1;
-	create_info.pQueueFamilyIndices = (uint32_t*) &context::get_queue_families().graphics;
+	create_info.pQueueFamilyIndices = (uint32_t*)&context::get_queue_families().graphics;
 
-	if (vkCreateBuffer(context::get_device(), &create_info, NULL, &buffer->m_handle) != VK_SUCCESS)
+	VkBuffer buffer;
+	if (vkCreateBuffer(context::get_device(), &create_info, NULL, &buffer) != VK_SUCCESS)
 		return NULL;
 
-	vkGetBufferMemoryRequirements(context::get_device(), buffer->m_handle, &buffer->m_requirements);
+	vkGetBufferMemoryRequirements(context::get_device(), buffer, out.requirements);
 	VkDeviceSize memorySize = size;
-	if (size < buffer->m_requirements.size)
-		memorySize = buffer->m_requirements.size;
-	VkDeviceMemory memory = memory::allocate_host_visible(memorySize, buffer->m_requirements.memoryTypeBits);
-	VkResult res = vkBindBufferMemory(context::get_device(), buffer->m_handle, memory, 0);
-	buffer->m_memory = memory;
+	if (size < out.requirements->size)
+		memorySize = out.requirements->size;
+	VkDeviceMemory memory = memory::allocate_host_visible(memorySize, out.requirements->memoryTypeBits);
+	VkResult res = vkBindBufferMemory(context::get_device(), buffer, memory, 0);
+	if (res != VK_SUCCESS) {
+		vkDestroyBuffer(context::get_device(), buffer, NULL);
+		return VK_NULL_HANDLE;
+	}
+	
 
-	memory::memcpy_host_to_device(buffer->m_memory, data, size);
+	if (!memory::memcpy_host_to_device(memory, data, size)) {
+		memory::free(memory);
+		vkDestroyBuffer(context::get_device(), buffer, NULL);
+		return VK_NULL_HANDLE;
+	}
+	*out.memory = memory;
+	return buffer;
+}
 
+std::shared_ptr<vertex_buffer> vertex_buffer::create(const void* data, size_t size) {
+	std::shared_ptr<vertex_buffer> buffer = std::make_shared<vertex_buffer>();
+	create_buffer_out out;
+	out.memory = &buffer->m_memory;
+	out.requirements = &buffer->m_requirements;
+	buffer->m_handle = create_buffer(out, data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+	buffer->m_size = size;
 	return buffer;
 }
 void vertex_buffer::destroy() {
 	if(m_handle != VK_NULL_HANDLE)
 		vkDestroyBuffer(context::get_device(), m_handle, NULL);
 	if(m_memory != VK_NULL_HANDLE)
+		memory::free(m_memory);
+	m_memory = VK_NULL_HANDLE;
+	m_handle = VK_NULL_HANDLE;
+}
+
+
+std::shared_ptr<index_buffer> index_buffer::create(const uint32_t* data, size_t size) {
+	std::shared_ptr<index_buffer> buffer = std::make_shared<index_buffer>();
+	create_buffer_out out;
+	out.memory = &buffer->m_memory;
+	out.requirements = &buffer->m_requirements;
+	buffer->m_handle = create_buffer(out, data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+	buffer->m_size = size;
+	return buffer;
+}
+
+void index_buffer::destroy() {
+	if (m_handle != VK_NULL_HANDLE)
+		vkDestroyBuffer(context::get_device(), m_handle, NULL);
+	if (m_memory != VK_NULL_HANDLE)
 		memory::free(m_memory);
 	m_memory = VK_NULL_HANDLE;
 	m_handle = VK_NULL_HANDLE;

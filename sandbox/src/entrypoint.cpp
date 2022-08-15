@@ -50,8 +50,15 @@ int main(const int argc, const char** argv) {
 	vkDestroyShaderModule(context::get_device(), vertex, NULL);
 	vkDestroyShaderModule(context::get_device(), fragment, NULL);
 
-	float data[] = { -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f };
+	float data[] = {
+		-0.5f, -0.5f, 0.0f,
+		0.5f, -0.5f, 0.0f,
+		0.5f, 0.5f, 0.0f,
+		-0.5f, 0.5f, 0.0f
+	};
+	uint32_t indices[] = { 0,1, 2, 0, 2, 3 };
 	std::shared_ptr<vertex_buffer> vbo = vertex_buffer::create(data, sizeof(data));
+	std::shared_ptr<index_buffer> ibo = index_buffer::create(indices, sizeof(indices));
 	
 	// record command buffers
 	command_buffer cmd_buffers[2];
@@ -74,10 +81,12 @@ int main(const int argc, const char** argv) {
 			render_pass_begin_info.renderArea.extent = context::get_swapchain().extent;
 
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(cmd_buf.get_handle(), 0, 1, &vbo->get_handle(), &offset);
 			vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
 			vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+
+			vkCmdBindIndexBuffer(cmd_buf.get_handle(), ibo->get_handle(), 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(cmd_buf.get_handle(), 0, 1, &vbo->get_handle(), &offset);
 
 			// set scissors and viewport
 			VkViewport viewport{};
@@ -96,7 +105,8 @@ int main(const int argc, const char** argv) {
 			vkCmdSetScissor(cmd_buf.get_handle(), 0, 1, &scissor);
 
 			// draw call
-			vkCmdDraw(cmd_buf.get_handle(), 3, 1, 0, 0);
+			uint32_t index_count = ibo->index_count();
+			vkCmdDrawIndexed(cmd_buf.get_handle(), index_count, 1, 0, 0, 0);
 
 			vkCmdEndRenderPass(cmd_buf.get_handle());
 
@@ -161,6 +171,7 @@ int main(const int argc, const char** argv) {
 	}
 
 
+	ibo->destroy();
 	vbo->destroy();
 	vkDestroyFence(context::get_device(), acquired_fence, NULL);
 	vkDestroySemaphore(context::get_device(), acquired_semaphore, NULL);
