@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <assert.h>
 
+VkRenderPass render_pass;
 
 void on_resize(int width, int height) {
 	printf("%d, %d\n", width, height);
+	context::recreate_swapchain(render_pass);
 }
 
 
@@ -36,7 +38,8 @@ int main(const int argc, const char** argv) {
 	render_pass_builder.begin_subpass();
 	render_pass_builder.write_color_attachment(output_location);
 	render_pass_builder.end_subpass();
-	VkRenderPass render_pass = render_pass_builder.build();
+	render_pass = render_pass_builder.build();
+
 
 	// create the graphics pipeline
 	pipeline_builder pipeline_builder{render_pass};
@@ -51,62 +54,57 @@ int main(const int argc, const char** argv) {
 	vkDestroyShaderModule(context::get_device(), vertex, NULL);
 	vkDestroyShaderModule(context::get_device(), fragment, NULL);
 
-	// create frame buffers
-	framebuffer framebuffers[2];
-	assert(stack_array_len(framebuffers) == context::get_swapchain().image_count);
-	for (int i = 0; i < sizeof(framebuffers) / sizeof(framebuffers[0]); i++) {
-		if (!framebuffers[i].add_color_attachment(context::get_swapchain().images[i], context::get_surface().surface_format.format))
-			return -1;
-		if (!framebuffers[i].create(render_pass, window.get_width(), window.get_height()))
-			return -1;
-	}
-
+	
 	// record command buffers
 	command_buffer cmd_buffers[2];
-	for (int i = 0; i < stack_array_len(cmd_buffers); i++) {
-		command_buffer& cmd_buf = cmd_buffers[i];
-		cmd_buf.start();
-		VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE;
+	context::set_framebuffer_change_callback([&cmd_buffers, &pipeline]() -> void {
+		for (int i = 0; i < stack_array_len(cmd_buffers); i++) {
+			command_buffer& cmd_buf = cmd_buffers[i];
+			cmd_buf.start();
+			VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE;
 
-		VkClearValue clear_value = {1.0f, 0.0f, 0.0f, 1.0f};
+			VkClearValue clear_value = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-		VkRenderPassBeginInfo render_pass_begin_info = {};
-		render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		render_pass_begin_info.pNext = NULL;
-		render_pass_begin_info.renderPass = render_pass;
-		render_pass_begin_info.framebuffer = framebuffers[i].get_handle();
-		render_pass_begin_info.clearValueCount = 1;
-		render_pass_begin_info.pClearValues = &clear_value;
-		render_pass_begin_info.renderArea.offset = { 0, 0 };
-		render_pass_begin_info.renderArea.extent = context::get_swapchain().extent;
+			VkRenderPassBeginInfo render_pass_begin_info = {};
+			render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			render_pass_begin_info.pNext = NULL;
+			render_pass_begin_info.renderPass = render_pass;
+			render_pass_begin_info.framebuffer = context::get_window_framebuffer(i).get_handle();
+			render_pass_begin_info.clearValueCount = 1;
+			render_pass_begin_info.pClearValues = &clear_value;
+			render_pass_begin_info.renderArea.offset = { 0, 0 };
+			render_pass_begin_info.renderArea.extent = context::get_swapchain().extent;
 
-		vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
-		vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
+			vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 
-		// set scissors and viewport
-		VkViewport viewport{};
-		viewport.x = 0.0f;
-		viewport.y = 0.0f;
-		viewport.width =  (float) render_pass_begin_info.renderArea.extent.width;
-		viewport.height = (float) render_pass_begin_info.renderArea.extent.height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-		
-		VkRect2D scissor;
-		scissor.offset = { 0, 0 };
-		scissor.extent = render_pass_begin_info.renderArea.extent;
-		
-		vkCmdSetViewport(cmd_buf.get_handle(), 0, 1, &viewport);
-		vkCmdSetScissor(cmd_buf.get_handle(), 0, 1, &scissor);
-		
-		// draw call
-		vkCmdDraw(cmd_buf.get_handle(), 3, 1, 0, 0);
+			// set scissors and viewport
+			VkViewport viewport{};
+			viewport.x = 0.0f;
+			viewport.y = 0.0f;
+			viewport.width = (float)render_pass_begin_info.renderArea.extent.width;
+			viewport.height = (float)render_pass_begin_info.renderArea.extent.height;
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
 
-		vkCmdEndRenderPass(cmd_buf.get_handle());
+			VkRect2D scissor;
+			scissor.offset = { 0, 0 };
+			scissor.extent = render_pass_begin_info.renderArea.extent;
 
-		cmd_buf.end();
-	}
+			vkCmdSetViewport(cmd_buf.get_handle(), 0, 1, &viewport);
+			vkCmdSetScissor(cmd_buf.get_handle(), 0, 1, &scissor);
+
+			// draw call
+			vkCmdDraw(cmd_buf.get_handle(), 3, 1, 0, 0);
+
+			vkCmdEndRenderPass(cmd_buf.get_handle());
+
+			cmd_buf.end();
+		}
+	});
+
+	context::create_window_framebuffers(render_pass);
 
 	constexpr uint64_t aquire_image_timeout = (uint64_t)1e9;
 	VkSemaphore acquired_semaphore = create_semaphore();
@@ -162,8 +160,6 @@ int main(const int argc, const char** argv) {
 	vkDestroySemaphore(context::get_device(), finished_rendering_semaphore, NULL);
 	for(command_buffer& cmd_buffer : cmd_buffers)
 		cmd_buffer.destroy();
-	for(framebuffer framebuffer : framebuffers)
-		framebuffer.destroy();
 	vkDestroyPipeline(context::get_device(), pipeline, NULL);
 	vkDestroyRenderPass(context::get_device(), render_pass, NULL);
 	delete ctx;

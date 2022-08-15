@@ -7,6 +7,7 @@
 class framebuffer {
 public:
 	framebuffer() : m_width(0), m_height(0) {}
+	~framebuffer() { destroy(); }
 	bool add_color_attachment(VkImage image, VkFormat format);
 	bool create(VkRenderPass renderpass, uint32_t width, uint32_t height);
 

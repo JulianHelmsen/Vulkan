@@ -30,6 +30,7 @@ bool context::init(window_handle_t handle) {
 	if (!create_command_pool())
 		return false;
 
+
 	return true;
 }
 
@@ -253,6 +254,8 @@ bool context::create_swapchain() {
 		vkDestroySwapchainKHR(m_device, m_swapchain.swapchain, NULL);
 		return VK_NULL_HANDLE;
 	}
+	if (m_swapchain.images)
+		delete[] m_swapchain.images;
 	m_swapchain.images = new VkImage[m_swapchain.image_count];
 
 	if (vkGetSwapchainImagesKHR(m_device, m_swapchain.swapchain, &m_swapchain.image_count, m_swapchain.images) != VK_SUCCESS) {
@@ -281,11 +284,14 @@ void context::make_context_current() {
 }
 
 context::~context() {
-	if (this == s_current)
-		s_current = NULL;
 	
-	if (m_swapchain.swapchain)
+
+	delete[] m_window_framebuffers;
+
+	if (m_swapchain.swapchain) {
 		vkDestroySwapchainKHR(m_device, m_swapchain.swapchain, NULL);
+		delete[] m_swapchain.images;
+	}
 	if (m_command_pool != VK_NULL_HANDLE)
 		vkDestroyCommandPool(m_device, m_command_pool, NULL);
 
@@ -295,5 +301,37 @@ context::~context() {
 	if (m_device)
 		vkDestroyDevice(m_device, NULL);
 
-		
+
+	if (this == s_current)
+		s_current = NULL;
+}
+
+
+bool context::create_window_framebuffers_impl(VkRenderPass render_pass) {
+	delete[] m_window_framebuffers;
+	m_window_framebuffers = new framebuffer[m_swapchain.image_count];
+
+	for (uint32_t img_index = 0; img_index < m_swapchain.image_count; img_index++) {
+		m_window_framebuffers[img_index].add_color_attachment(m_swapchain.images[img_index], m_surface.surface_format.format);
+		m_window_framebuffers[img_index].create(render_pass, m_swapchain.extent.width, m_swapchain.extent.height);
+	}
+
+	if (m_framebuffer_change_callback)
+		m_framebuffer_change_callback();
+
+	return true;
+}
+
+bool context::recreate_swapchain_impl(VkRenderPass render_pass) {
+	VkSwapchainKHR old = m_swapchain.swapchain;
+	if (!create_swapchain())
+		return false;
+	if (old != VK_NULL_HANDLE)
+		vkDestroySwapchainKHR(m_device, old, NULL);
+
+
+	if (!create_window_framebuffers(render_pass))
+		return false;
+
+	return true;
 }

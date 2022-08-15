@@ -3,9 +3,12 @@
 
 #include "engine/core/window.h"
 #include <vulkan/vulkan.h>
+#include "framebuffer.h"
+#include <functional>
 
 class context {
 public:
+	using framebuffer_change_callback = std::function<void()>;
 	static context* create_context(window_handle_t handle);
 	void make_context_current();
 
@@ -32,7 +35,15 @@ public:
 	static const VkQueue& get_graphics_queue() { return s_current->m_graphics_queue; }
 	static const VkQueue& get_transfer_queue() { return s_current->m_transfer_queue; }
 
+	static bool recreate_swapchain(VkRenderPass render_pass) { return s_current->recreate_swapchain_impl(render_pass); }
+	static bool create_window_framebuffers(VkRenderPass render_pass) { return s_current->create_window_framebuffers_impl(render_pass); }
+
+	static const framebuffer& get_window_framebuffer(uint32_t index) { return s_current->m_window_framebuffers[index]; }
+
+	static void set_framebuffer_change_callback(framebuffer_change_callback callback) { s_current->m_framebuffer_change_callback = callback; }
+
 private:
+	bool recreate_swapchain_impl(VkRenderPass render_pass);
 
 
 	struct queue_family_indices {
@@ -48,7 +59,10 @@ private:
 	bool create_logical_device(const std::vector<const char*>& extensions);
 	bool create_swapchain();
 	bool create_command_pool();
+	bool create_window_framebuffers_impl(VkRenderPass render_pass);
 
+
+	framebuffer_change_callback m_framebuffer_change_callback;
 	static context* s_current;
 	surface m_surface{};
 	swapchain m_swapchain{};
@@ -61,6 +75,8 @@ private:
 
 	VkCommandPool m_command_pool = VK_NULL_HANDLE;
 	queue_family_indices m_queue_family_indices;
+
+	framebuffer* m_window_framebuffers = NULL;
 
 
 
