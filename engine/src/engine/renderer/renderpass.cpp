@@ -1,10 +1,10 @@
 #include "renderpass.h"
-#include "render_api.h"
+#include "context.h"
 #include <assert.h>
 
 static void make_present_attachment(VkAttachmentDescription& descr, const render_pass_builder::attachment_description& attachment_descr) {
 	descr.flags = 0;
-	descr.format = render_api::get_surface_format().format;
+	descr.format = context::get_surface().surface_format.format;
 	descr.samples = (VkSampleCountFlagBits) attachment_descr.samples; // maps perfectly to integer values
 	descr.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	descr.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -71,7 +71,7 @@ VkRenderPass render_pass_builder::build() {
 
 
 	VkRenderPass render_pass;
-	if(vkCreateRenderPass(render_api::get_device(), &create_info, NULL, &render_pass) == VK_SUCCESS)
+	if(vkCreateRenderPass(context::get_device(), &create_info, NULL, &render_pass) == VK_SUCCESS)
 		return render_pass;
 	return VK_NULL_HANDLE;
 }

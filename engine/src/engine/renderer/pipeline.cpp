@@ -1,5 +1,5 @@
 #include "pipeline.h"
-#include "render_api.h"
+#include "context.h"
 #include <stdlib.h>
 #include <assert.h>
 
@@ -187,7 +187,7 @@ VkPipeline pipeline_builder::build() {
 
 	
 	VkPipelineLayout layout;
-	VkResult layout_result = vkCreatePipelineLayout(render_api::get_device(), &layout_create_info, NULL, &layout);
+	VkResult layout_result = vkCreatePipelineLayout(context::get_device(), &layout_create_info, NULL, &layout);
 	if(layout_result != VK_SUCCESS) {
 		result = layout_result;
 		goto return_label;
@@ -218,8 +218,8 @@ VkPipeline pipeline_builder::build() {
 	create_info.basePipelineIndex = -1;
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	
-	result = vkCreateGraphicsPipelines(render_api::get_device(), VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline);
-	vkDestroyPipelineLayout(render_api::get_device(), layout, NULL);
+	result = vkCreateGraphicsPipelines(context::get_device(), VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline);
+	vkDestroyPipelineLayout(context::get_device(), layout, NULL);
 return_label:
 	free(vertex_buffer_description);
 	return result == VK_SUCCESS ? pipeline : VK_NULL_HANDLE;

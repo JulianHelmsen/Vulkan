@@ -2,7 +2,6 @@
 #define ENGINE_CORE_WINDOW_H
 
 #include <stdint.h>
-#include <vulkan/vulkan.h>
 #include <functional>
 
 typedef uint64_t window_handle_t;
@@ -27,17 +26,11 @@ public:
 	int get_height() const { return m_height; };
 
 
-	inline VkSurfaceKHR get_surface() const { return m_surface; }
-
-	bool create_surface(VkInstance instance);
-
 	void on_resize(resize_event_handler handler) { m_resize_handler = handler; }
 private:
 
 	int m_width;
 	int m_height;
-
-	VkSurfaceKHR m_surface;
 
 	window_handle_t m_window_handle;
 	bool m_close_requested;

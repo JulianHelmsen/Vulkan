@@ -1,5 +1,5 @@
 #include "framebuffer.h"
-#include "render_api.h"
+#include "context.h"
 
 
 bool framebuffer::add_color_attachment(VkImage image, VkFormat format) {
@@ -22,7 +22,7 @@ bool framebuffer::add_color_attachment(VkImage image, VkFormat format) {
 	view_create_info.subresourceRange.layerCount = 1;
 
 	VkImageView view;
-	if (vkCreateImageView(render_api::get_device(), &view_create_info, NULL, &view) != VK_SUCCESS)
+	if (vkCreateImageView(context::get_device(), &view_create_info, NULL, &view) != VK_SUCCESS)
 		return false;
 	m_attachments.push_back(view);
 	return true;
@@ -43,12 +43,12 @@ bool framebuffer::create(VkRenderPass renderpass, uint32_t width, uint32_t heigh
 	create_info.height = m_height;
 	create_info.layers = 1;
 
-	return VK_SUCCESS == vkCreateFramebuffer(render_api::get_device(), &create_info, NULL, &m_handle);
+	return VK_SUCCESS == vkCreateFramebuffer(context::get_device(), &create_info, NULL, &m_handle);
 }
 
 
 void framebuffer::destroy() {
 	for (VkImageView view : m_attachments)
-		vkDestroyImageView(render_api::get_device(), view, NULL);
-	vkDestroyFramebuffer(render_api::get_device(), m_handle, NULL);
+		vkDestroyImageView(context::get_device(), view, NULL);
+	vkDestroyFramebuffer(context::get_device(), m_handle, NULL);
 }

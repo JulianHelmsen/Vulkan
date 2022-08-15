@@ -1,5 +1,5 @@
 #include "command_buffer.h"
-#include "render_api.h"
+#include "context.h"
 
 
 command_buffer::command_buffer(VkCommandBufferLevel level) : m_handle(VK_NULL_HANDLE) {
@@ -7,10 +7,10 @@ command_buffer::command_buffer(VkCommandBufferLevel level) : m_handle(VK_NULL_HA
 	allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocate_info.pNext = NULL;
 	allocate_info.commandBufferCount = 1;
-	allocate_info.commandPool = render_api::get_command_pool();
+	allocate_info.commandPool = context::get_command_pool();
 	allocate_info.level = level;
 
-	vkAllocateCommandBuffers(render_api::get_device(), &allocate_info, &m_handle);
+	vkAllocateCommandBuffers(context::get_device(), &allocate_info, &m_handle);
 }
 
 bool command_buffer::start() {
@@ -26,5 +26,5 @@ bool command_buffer::end() {
 }
 
 void command_buffer::destroy() {
-	vkFreeCommandBuffers(render_api::get_device(), render_api::get_command_pool(), 1, &m_handle);
+	vkFreeCommandBuffers(context::get_device(), context::get_command_pool(), 1, &m_handle);
 }

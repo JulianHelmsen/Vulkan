@@ -1,5 +1,5 @@
 #include "synchronization.h"
-#include "render_api.h"
+#include "context.h"
 #include <assert.h>
 
 
@@ -12,7 +12,7 @@ VkSemaphore create_semaphore() {
 
 
 	VkSemaphore semaphore = VK_NULL_HANDLE;
-	VkResult res = vkCreateSemaphore(render_api::get_device(), &create_info, NULL, &semaphore);
+	VkResult res = vkCreateSemaphore(context::get_device(), &create_info, NULL, &semaphore);
 	assert(res == VK_SUCCESS);
 	return semaphore;
 }
@@ -25,12 +25,12 @@ VkFence create_fence() {
 
 	VkFence fence = VK_NULL_HANDLE;
 
-	VkResult res = vkCreateFence(render_api::get_device(), &create_info, NULL, &fence);
+	VkResult res = vkCreateFence(context::get_device(), &create_info, NULL, &fence);
 	assert(res == VK_SUCCESS);
 	return fence;
 }
 
 
 VkResult waitFence(VkFence fence, uint64_t timeout) {
-	return vkWaitForFences(render_api::get_device(), 1, &fence, VK_TRUE, timeout);
+	return vkWaitForFences(context::get_device(), 1, &fence, VK_TRUE, timeout);
 }

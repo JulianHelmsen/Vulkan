@@ -6,7 +6,6 @@
 
 void on_resize(int width, int height) {
 	printf("%d, %d\n", width, height);
-	render_api::recreate_swapchain();
 }
 
 
@@ -18,10 +17,18 @@ int main(const int argc, const char** argv) {
 	window.on_resize(on_resize);
 
 	// basic initialization of vulkan
-	if (!render_api::init(window)) {
+	if (!render_api::init()) {
 		window.destroy();
 		return -1;
 	}
+	context* ctx = context::create_context(window.get_handle());
+	if (ctx == NULL) {
+		render_api::shutdown();
+		window.destroy();
+		return -1;
+	}
+
+	ctx->make_context_current();
 
 	// create the renderpass
 	render_pass_builder render_pass_builder;
@@ -35,20 +42,20 @@ int main(const int argc, const char** argv) {
 	pipeline_builder pipeline_builder{render_pass};
 	VkShaderModule vertex = shader::load_module_from_file("res/vertex.spv");
 	VkShaderModule fragment = shader::load_module_from_file("res/fragment.spv");
-	VkExtent2D swapchain_extent = render_api::get_swapchain_extent();
+	VkExtent2D swapchain_extent = context::get_swapchain().extent;
 	pipeline_builder.set_viewport(0.0f, 0.0f, (float) swapchain_extent.width, (float)swapchain_extent.height);
 	pipeline_builder.set_vertex_shader(vertex);
 	pipeline_builder.set_fragment_shader(fragment);
 	VkPipeline pipeline = pipeline_builder.build();
 	
-	vkDestroyShaderModule(render_api::get_device(), vertex, NULL);
-	vkDestroyShaderModule(render_api::get_device(), fragment, NULL);
+	vkDestroyShaderModule(context::get_device(), vertex, NULL);
+	vkDestroyShaderModule(context::get_device(), fragment, NULL);
 
 	// create frame buffers
 	framebuffer framebuffers[2];
-	assert(stack_array_len(framebuffers) == render_api::get_swapchain_image_count());
+	assert(stack_array_len(framebuffers) == context::get_swapchain().image_count);
 	for (int i = 0; i < sizeof(framebuffers) / sizeof(framebuffers[0]); i++) {
-		if (!framebuffers[i].add_color_attachment(render_api::get_swapchain_image(i), render_api::get_surface_format().format))
+		if (!framebuffers[i].add_color_attachment(context::get_swapchain().images[i], context::get_surface().surface_format.format))
 			return -1;
 		if (!framebuffers[i].create(render_pass, window.get_width(), window.get_height()))
 			return -1;
@@ -71,7 +78,7 @@ int main(const int argc, const char** argv) {
 		render_pass_begin_info.clearValueCount = 1;
 		render_pass_begin_info.pClearValues = &clear_value;
 		render_pass_begin_info.renderArea.offset = { 0, 0 };
-		render_pass_begin_info.renderArea.extent = render_api::get_swapchain_extent();
+		render_pass_begin_info.renderArea.extent = context::get_swapchain().extent;
 
 		vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
 		vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -106,9 +113,9 @@ int main(const int argc, const char** argv) {
 	VkFence acquired_fence = create_fence();
 	VkSemaphore finished_rendering_semaphore  = create_semaphore();
 	while (!window.is_closed_requsted()) {
-		vkResetFences(render_api::get_device(), 1, &acquired_fence);
+		vkResetFences(context::get_device(), 1, &acquired_fence);
 		uint32_t image_index;
-		if (vkAcquireNextImageKHR(render_api::get_device(), render_api::get_swapchain(), aquire_image_timeout, acquired_semaphore, acquired_fence, &image_index) == VK_TIMEOUT)
+		if (vkAcquireNextImageKHR(context::get_device(), context::get_swapchain().swapchain, aquire_image_timeout, acquired_semaphore, acquired_fence, &image_index) == VK_TIMEOUT)
 			continue;
 		waitFence(acquired_fence, aquire_image_timeout);
 		command_buffer& to_execute = cmd_buffers[image_index];
@@ -129,7 +136,7 @@ int main(const int argc, const char** argv) {
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &finished_rendering_semaphore;
 
-		vkQueueSubmit(render_api::get_graphics_queue(), 1, &submit_info, VK_NULL_HANDLE);
+		vkQueueSubmit(context::get_graphics_queue(), 1, &submit_info, VK_NULL_HANDLE);
 
 
 		VkPresentInfoKHR present_info = {};
@@ -138,27 +145,28 @@ int main(const int argc, const char** argv) {
 		present_info.waitSemaphoreCount = 1;
 		present_info.pWaitSemaphores = &finished_rendering_semaphore;
 		present_info.swapchainCount = 1;
-		present_info.pSwapchains = &render_api::get_swapchain();
+		present_info.pSwapchains = &context::get_swapchain().swapchain;
 		present_info.pImageIndices = &image_index;
 		present_info.pResults = NULL;
 
-		vkQueuePresentKHR(render_api::get_graphics_queue(), &present_info);
+		vkQueuePresentKHR(context::get_graphics_queue(), &present_info);
 		
-		vkDeviceWaitIdle(render_api::get_device());
+		vkDeviceWaitIdle(context::get_device());
 		// present image
 		window.poll_events();
 	}
 
 
-	vkDestroyFence(render_api::get_device(), acquired_fence, NULL);
-	vkDestroySemaphore(render_api::get_device(), acquired_semaphore, NULL);
-	vkDestroySemaphore(render_api::get_device(), finished_rendering_semaphore, NULL);
+	vkDestroyFence(context::get_device(), acquired_fence, NULL);
+	vkDestroySemaphore(context::get_device(), acquired_semaphore, NULL);
+	vkDestroySemaphore(context::get_device(), finished_rendering_semaphore, NULL);
 	for(command_buffer& cmd_buffer : cmd_buffers)
 		cmd_buffer.destroy();
 	for(framebuffer framebuffer : framebuffers)
 		framebuffer.destroy();
-	vkDestroyPipeline(render_api::get_device(), pipeline, NULL);
-	vkDestroyRenderPass(render_api::get_device(), render_pass, NULL);
+	vkDestroyPipeline(context::get_device(), pipeline, NULL);
+	vkDestroyRenderPass(context::get_device(), render_pass, NULL);
+	delete ctx;
 	render_api::shutdown();
 	window.destroy();
 	return 0;

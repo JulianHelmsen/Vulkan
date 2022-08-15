@@ -1,5 +1,5 @@
 #include "shader.h"
-#include "render_api.h"
+#include "context.h"
 #include <stdio.h>
 
 VkShaderModule shader::load_module_from_file(const char* filepath) {
@@ -40,7 +40,7 @@ VkShaderModule shader::load_module(const void* data, uint32_t size) {
 	create_info.pCode = (uint32_t*)data;
 
 	VkShaderModule shader_module;
-	if(vkCreateShaderModule(render_api::get_device(), &create_info, NULL, &shader_module) == VK_SUCCESS)
+	if(vkCreateShaderModule(context::get_device(), &create_info, NULL, &shader_module) == VK_SUCCESS)
 		return shader_module;
 	return VK_NULL_HANDLE;
 }
