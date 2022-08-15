@@ -44,7 +44,7 @@ public:
 	void destroy();
 
 	const VkBuffer& get_handle() { return m_handle; }
-	const uint32_t index_count() const { return m_size / sizeof(uint32_t); }
+	const uint32_t index_count() const { return (uint32_t) m_size / sizeof(uint32_t); }
 private:
 	size_t m_size;
 	VkDeviceMemory m_memory = VK_NULL_HANDLE;
