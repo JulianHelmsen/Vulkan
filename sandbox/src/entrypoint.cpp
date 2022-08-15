@@ -38,6 +38,7 @@ int main(const int argc, const char** argv) {
 
 	// create the graphics pipeline
 	pipeline_builder pipeline_builder{render_pass};
+	pipeline_builder.buffer_layout_push_floats(3);
 	VkShaderModule vertex = shader::load_module_from_file("res/vertex.spv");
 	VkShaderModule fragment = shader::load_module_from_file("res/fragment.spv");
 	VkExtent2D swapchain_extent = context::get_swapchain().extent;
@@ -49,10 +50,12 @@ int main(const int argc, const char** argv) {
 	vkDestroyShaderModule(context::get_device(), vertex, NULL);
 	vkDestroyShaderModule(context::get_device(), fragment, NULL);
 
+	float data[] = { -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f };
+	std::shared_ptr<vertex_buffer> vbo = vertex_buffer::create(data, sizeof(data));
 	
 	// record command buffers
 	command_buffer cmd_buffers[2];
-	context::set_framebuffer_change_callback([&cmd_buffers, &pipeline, &render_pass]() -> void {
+	context::set_framebuffer_change_callback([&]() -> void {
 		for (int i = 0; i < stack_array_len(cmd_buffers); i++) {
 			command_buffer& cmd_buf = cmd_buffers[i];
 			cmd_buf.start();
@@ -70,6 +73,8 @@ int main(const int argc, const char** argv) {
 			render_pass_begin_info.renderArea.offset = { 0, 0 };
 			render_pass_begin_info.renderArea.extent = context::get_swapchain().extent;
 
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(cmd_buf.get_handle(), 0, 1, &vbo->get_handle(), &offset);
 			vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
 			vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
@@ -98,6 +103,7 @@ int main(const int argc, const char** argv) {
 			cmd_buf.end();
 		}
 	});
+
 
 	context::create_window_framebuffers(render_pass);
 
@@ -155,6 +161,7 @@ int main(const int argc, const char** argv) {
 	}
 
 
+	vbo->destroy();
 	vkDestroyFence(context::get_device(), acquired_fence, NULL);
 	vkDestroySemaphore(context::get_device(), acquired_semaphore, NULL);
 	vkDestroySemaphore(context::get_device(), finished_rendering_semaphore, NULL);

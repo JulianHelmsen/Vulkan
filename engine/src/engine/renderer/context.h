@@ -26,6 +26,12 @@ public:
 		VkSurfaceKHR surface;
 		VkSurfaceFormatKHR surface_format;
 	};
+	struct queue_family_indices {
+		int graphics;
+		int transfer;
+		bool dedicated_transfer = false;
+	};
+
 
 	static VkDevice get_device() { return s_current->m_device; }
 	static VkPhysicalDevice get_physical_device() { return s_current->m_physical_device; }
@@ -42,16 +48,13 @@ public:
 
 	static void set_framebuffer_change_callback(framebuffer_change_callback callback) { s_current->m_framebuffer_change_callback = callback; }
 
+	static const queue_family_indices& get_queue_families() { return s_current->m_queue_family_indices; }
+
 private:
 	bool recreate_swapchain_impl(VkRenderPass render_pass);
 
 
-	struct queue_family_indices {
-		int graphics;
-		int transfer;
-		bool dedicated_transfer = false;
-	};
-
+	
 	bool init(window_handle_t handle);
 	bool create_surface(window_handle_t handle);
 
