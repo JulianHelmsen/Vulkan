@@ -17,6 +17,7 @@ public:
 
 	inline bool is_closed() const { return m_closed; }
 	inline bool is_closed_requsted() const { return m_close_requested; }
+	bool is_minimized() const;
 
 	void destroy();
 

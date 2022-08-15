@@ -144,6 +144,8 @@ int main(const int argc, const char** argv) {
 
 		VkResult present_result = vkQueuePresentKHR(context::get_graphics_queue(), &present_info);
 		if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+			while (window.is_minimized() && !window.is_closed_requsted())
+				window.wait_events();
 			context::recreate_swapchain(render_pass);
 		}
 		

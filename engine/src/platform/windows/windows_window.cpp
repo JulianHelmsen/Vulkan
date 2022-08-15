@@ -73,6 +73,9 @@ window::window(const char* title, int width, int height) : m_window_handle(0), m
 	ShowWindow(window_handle, SW_SHOW);
 }
 
+bool window::is_minimized() const {
+	return IsIconic((HWND) m_window_handle);
+}
 
 void window::poll_events() {
 	MSG msg = {};
