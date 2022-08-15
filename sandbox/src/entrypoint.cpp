@@ -3,12 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-VkRenderPass render_pass;
 
-void on_resize(int width, int height) {
-	printf("%d, %d\n", width, height);
-	context::recreate_swapchain(render_pass);
-}
 
 
 int main(const int argc, const char** argv) {
@@ -16,7 +11,6 @@ int main(const int argc, const char** argv) {
 	// create the window
 	window window{"Title", 1020, 720};
 
-	window.on_resize(on_resize);
 
 	// basic initialization of vulkan
 	if (!render_api::init()) {
@@ -38,7 +32,8 @@ int main(const int argc, const char** argv) {
 	render_pass_builder.begin_subpass();
 	render_pass_builder.write_color_attachment(output_location);
 	render_pass_builder.end_subpass();
-	render_pass = render_pass_builder.build();
+
+	VkRenderPass render_pass = render_pass_builder.build();
 
 
 	// create the graphics pipeline
@@ -57,7 +52,7 @@ int main(const int argc, const char** argv) {
 	
 	// record command buffers
 	command_buffer cmd_buffers[2];
-	context::set_framebuffer_change_callback([&cmd_buffers, &pipeline]() -> void {
+	context::set_framebuffer_change_callback([&cmd_buffers, &pipeline, &render_pass]() -> void {
 		for (int i = 0; i < stack_array_len(cmd_buffers); i++) {
 			command_buffer& cmd_buf = cmd_buffers[i];
 			cmd_buf.start();
@@ -147,7 +142,10 @@ int main(const int argc, const char** argv) {
 		present_info.pImageIndices = &image_index;
 		present_info.pResults = NULL;
 
-		vkQueuePresentKHR(context::get_graphics_queue(), &present_info);
+		VkResult present_result = vkQueuePresentKHR(context::get_graphics_queue(), &present_info);
+		if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+			context::recreate_swapchain(render_pass);
+		}
 		
 		vkDeviceWaitIdle(context::get_device());
 		// present image

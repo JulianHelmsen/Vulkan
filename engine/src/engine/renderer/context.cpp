@@ -323,6 +323,7 @@ bool context::create_window_framebuffers_impl(VkRenderPass render_pass) {
 }
 
 bool context::recreate_swapchain_impl(VkRenderPass render_pass) {
+	vkDeviceWaitIdle(m_device);
 	VkSwapchainKHR old = m_swapchain.swapchain;
 	if (!create_swapchain())
 		return false;
