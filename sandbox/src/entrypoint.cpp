@@ -68,7 +68,7 @@ int main(const int argc, const char** argv) {
 			cmd_buf.start();
 			VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE;
 
-			VkClearValue clear_value = { 1.0f, 0.0f, 0.0f, 1.0f };
+			VkClearValue clear_value = { 0.1f, 0.1f, 0.1f, 1.0f };
 
 			VkRenderPassBeginInfo render_pass_begin_info = {};
 			render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

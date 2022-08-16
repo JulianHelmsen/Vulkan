@@ -23,7 +23,7 @@ static uint32_t get_memory_type_index(VkMemoryPropertyFlags required_flag_bits, 
 	for (uint32_t type_idx = 0; type_idx < s_info.properties.memoryTypeCount; type_idx++) {
 		bool required_type = ((1 << type_idx) & memory_requirment_type_bits) != 0;
 		const auto& type = s_info.properties.memoryTypes[type_idx];
-		if (type.propertyFlags & required_flag_bits)
+		if ((type.propertyFlags & required_flag_bits) == required_flag_bits)
 			return type_idx;
 
 	}
@@ -38,7 +38,12 @@ VkDeviceMemory memory::allocate_host_visible(size_t size, uint32_t memory_type) 
 	allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocate_info.pNext = NULL;
 	allocate_info.allocationSize = (VkDeviceSize)size;
-	allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, memory_type);
+	allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, memory_type);
+	if(allocate_info.memoryTypeIndex == INVALID_TYPE_IDX)
+		allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, memory_type);
+	if (allocate_info.memoryTypeIndex == INVALID_TYPE_IDX)
+		return VK_NULL_HANDLE;
+
 
 	auto& type = s_info.properties.memoryTypes[allocate_info.memoryTypeIndex];
 	auto& heap = s_info.properties.memoryHeaps[type.heapIndex];
