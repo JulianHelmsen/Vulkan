@@ -30,6 +30,8 @@ bool context::init(window_handle_t handle) {
 	if (!create_command_pool())
 		return false;
 
+	m_allocator.initialize(m_physical_device, m_device);
+
 
 	return true;
 }
@@ -287,6 +289,8 @@ context::~context() {
 	
 
 	delete[] m_window_framebuffers;
+
+	m_allocator.destroy();
 
 	if (m_swapchain.swapchain) {
 		vkDestroySwapchainKHR(m_device, m_swapchain.swapchain, NULL);

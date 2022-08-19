@@ -56,9 +56,39 @@ int main(const int argc, const char** argv) {
 		0.5f, 0.5f, 0.0f,
 		-0.5f, 0.5f, 0.0f
 	};
-	uint32_t indices[] = { 0,1, 2, 0, 2, 3 };
-	std::shared_ptr<vertex_buffer> vbo = vertex_buffer::create(data, sizeof(data));
-	std::shared_ptr<index_buffer> ibo = index_buffer::create(indices, sizeof(indices));
+	uint32_t indices[] = { 0, 1, 2, 0, 2, 3 };
+	std::shared_ptr<vertex_buffer> vbo = vertex_buffer::create();
+	std::shared_ptr<index_buffer> ibo = index_buffer::create();
+	vbo->set_buffer_data(data, sizeof(data));
+	ibo->set_buffer_data(indices, sizeof(indices));
+
+	allocator& allocator = context::get_memory_allocator();
+	allocator::sub_allocation memory1 = allocator.allocate(100, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory2 = allocator.allocate(500, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory3 = allocator.allocate(300, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory4 = allocator.allocate(900, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory5 = allocator.allocate(1000, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory6 = allocator.allocate(723, (uint32_t) (1 << 8), allocator::access_flags::STATIC);
+
+	// make space in between
+	allocator.free(memory4);
+	allocator::sub_allocation memory9 = allocator.allocate(1030, (uint32_t)(1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory7 = allocator.allocate(300, (uint32_t)(1 << 8), allocator::access_flags::STATIC);
+	allocator::sub_allocation memory8 = allocator.allocate(728, (uint32_t)(1 << 8), allocator::access_flags::STATIC);
+
+	// free all other memory blocks
+	allocator.free(memory1);
+	allocator.free(memory2);
+	allocator.free(memory3);
+	allocator.free(memory5);
+	allocator.free(memory6);
+	allocator.free(memory7);
+	allocator.free(memory8);
+	allocator.free(memory9);
+	
+
+	
+
 	
 	// record command buffers
 	command_buffer cmd_buffers[2];

@@ -4,9 +4,13 @@
 
 bool memory::s_initialized_types = false;
 #define INVALID_TYPE_IDX (0xFFFFFFFF)
+
+
 static struct {
 	VkPhysicalDeviceMemoryProperties properties;
 	VkDeviceSize nonCoherentAtomSize;
+
+	
 }s_info;
 
 void memory::init() {
@@ -18,6 +22,8 @@ void memory::init() {
 
 	s_initialized_types = true;
 }
+
+
 
 static uint32_t get_memory_type_index(VkMemoryPropertyFlags required_flag_bits, uint32_t memory_requirment_type_bits) {
 	for (uint32_t type_idx = 0; type_idx < s_info.properties.memoryTypeCount; type_idx++) {
@@ -79,6 +85,7 @@ VkDeviceMemory memory::allocate_device_visible(size_t size, uint32_t memory_type
 	return memory;
 }
 
+
 bool memory::memcpy_host_to_device(VkDeviceMemory memory, const void* data, size_t size) {
 	VkDeviceSize d_size = size;
 	if (size % s_info.nonCoherentAtomSize)
@@ -107,81 +114,135 @@ void memory::free(VkDeviceMemory memory) {
 	vkFreeMemory(context::get_device(), memory, NULL);
 }
 
-struct create_buffer_out {
-	VkDeviceMemory* memory;
-	VkMemoryRequirements* requirements;
-};
 
-static VkBuffer create_buffer(create_buffer_out& out, const void* data, size_t size, VkBufferUsageFlagBits usage) {
+bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage, bool host_visible) {
+	// initialize buffer info
+	info.capacity = 0;
+	info.handle = VK_NULL_HANDLE;
+	info.memory = VK_NULL_HANDLE;
+
+	// create the buffer handle
 	VkBufferCreateInfo create_info = { };
 	create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	create_info.pNext = NULL;
 	create_info.flags = 0;
-	create_info.size = size;
+	create_info.size = capacity;
 	create_info.usage = usage;
 	create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_info.queueFamilyIndexCount = 1;
 	create_info.pQueueFamilyIndices = (uint32_t*)&context::get_queue_families().graphics;
 
-	VkBuffer buffer;
-	if (vkCreateBuffer(context::get_device(), &create_info, NULL, &buffer) != VK_SUCCESS)
-		return NULL;
-
-	vkGetBufferMemoryRequirements(context::get_device(), buffer, out.requirements);
-	VkDeviceSize memorySize = size;
-	if (size < out.requirements->size)
-		memorySize = out.requirements->size;
-	VkDeviceMemory memory = memory::allocate_host_visible(memorySize, out.requirements->memoryTypeBits);
-	VkResult res = vkBindBufferMemory(context::get_device(), buffer, memory, 0);
-	if (res != VK_SUCCESS) {
-		vkDestroyBuffer(context::get_device(), buffer, NULL);
-		return VK_NULL_HANDLE;
-	}
+	if (vkCreateBuffer(context::get_device(), &create_info, NULL, &info.handle) != VK_SUCCESS)
+		return false;
+	// query buffer memory requirements
+	vkGetBufferMemoryRequirements(context::get_device(), info.handle, &info.memory_requirements);
 	
+	// make sure to allocate atleast the required amount of memory
+	if (capacity < info.memory_requirements.size)
+		capacity = info.memory_requirements.size;
 
-	if (!memory::memcpy_host_to_device(memory, data, size)) {
-		memory::free(memory);
-		vkDestroyBuffer(context::get_device(), buffer, NULL);
-		return VK_NULL_HANDLE;
+	// allocate memory
+	if(host_visible)
+		info.memory = memory::allocate_host_visible((VkDeviceSize)capacity, info.memory_requirements.memoryTypeBits);
+	else
+		info.memory = memory::allocate_device_visible((VkDeviceSize)capacity, info.memory_requirements.memoryTypeBits);
+
+	// check for allocation errors
+	if (info.memory == VK_NULL_HANDLE) {
+		// failed to allocate memory for this buffer
+		vkDestroyBuffer(context::get_device(), info.handle, NULL);
+		info.handle = VK_NULL_HANDLE;
+		info.capacity = 0;
+		return false;
 	}
-	*out.memory = memory;
-	return buffer;
+
+	// bind the allocated memory to the buffer
+	if (vkBindBufferMemory(context::get_device(), info.handle, info.memory, 0) != VK_SUCCESS) {
+		// failed to bind memory to buffer
+		vkFreeMemory(context::get_device(), info.memory, NULL);
+		vkDestroyBuffer(context::get_device(), info.handle, NULL);
+		info.memory = VK_NULL_HANDLE;
+		info.handle = VK_NULL_HANDLE;
+		info.capacity = 0;
+		return false;
+	}
+
+	// set buffer size
+	info.capacity = capacity;
+	// buffer creation, memory allocation and binding was successfull
+	return true;
 }
 
-std::shared_ptr<vertex_buffer> vertex_buffer::create(const void* data, size_t size) {
-	std::shared_ptr<vertex_buffer> buffer = std::make_shared<vertex_buffer>();
-	create_buffer_out out;
-	out.memory = &buffer->m_memory;
-	out.requirements = &buffer->m_requirements;
-	buffer->m_handle = create_buffer(out, data, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	buffer->m_size = size;
-	return buffer;
+
+std::shared_ptr<index_buffer> index_buffer::create() {
+	return std::make_shared<index_buffer>();
 }
+
+std::shared_ptr<vertex_buffer> vertex_buffer::create() {
+	return std::make_shared<vertex_buffer>();
+}
+
 void vertex_buffer::destroy() {
-	if(m_handle != VK_NULL_HANDLE)
-		vkDestroyBuffer(context::get_device(), m_handle, NULL);
-	if(m_memory != VK_NULL_HANDLE)
-		memory::free(m_memory);
-	m_memory = VK_NULL_HANDLE;
-	m_handle = VK_NULL_HANDLE;
-}
-
-
-std::shared_ptr<index_buffer> index_buffer::create(const uint32_t* data, size_t size) {
-	std::shared_ptr<index_buffer> buffer = std::make_shared<index_buffer>();
-	create_buffer_out out;
-	out.memory = &buffer->m_memory;
-	out.requirements = &buffer->m_requirements;
-	buffer->m_handle = create_buffer(out, data, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-	buffer->m_size = size;
-	return buffer;
+	if(m_info.handle != VK_NULL_HANDLE)
+		vkDestroyBuffer(context::get_device(), m_info.handle, NULL);
+	if(m_info.memory != VK_NULL_HANDLE)
+		memory::free(m_info.memory);
+	m_info.memory = VK_NULL_HANDLE;
+	m_info.handle = VK_NULL_HANDLE;
+	m_info.capacity = 0;
 }
 
 void index_buffer::destroy() {
-	if (m_handle != VK_NULL_HANDLE)
-		vkDestroyBuffer(context::get_device(), m_handle, NULL);
-	if (m_memory != VK_NULL_HANDLE)
-		memory::free(m_memory);
-	m_memory = VK_NULL_HANDLE;
-	m_handle = VK_NULL_HANDLE;
+	if (m_info.handle != VK_NULL_HANDLE)
+		vkDestroyBuffer(context::get_device(), m_info.handle, NULL);
+	if (m_info.memory != VK_NULL_HANDLE)
+		memory::free(m_info.memory);
+	m_info.memory = VK_NULL_HANDLE;
+	m_info.handle = VK_NULL_HANDLE;
+	m_info.capacity = 0;
 }
+
+
+
+bool vertex_buffer::set_buffer_data(const void* data, size_t n_bytes) {
+	// (re)allocate buffer
+	if(m_info.capacity < n_bytes) {
+		// clean up old memory
+		if (m_info.handle != VK_NULL_HANDLE)
+			destroy();
+
+		// allocate new buffer
+		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true))
+			return false;
+	}
+
+	// memcpy host to device
+	if (!memory::memcpy_host_to_device(m_info.memory, data, n_bytes)) {
+		destroy();
+		return false;
+	}
+	m_size = n_bytes;
+	return true;
+}
+bool index_buffer::set_buffer_data(const uint32_t* indices, size_t n_bytes) {
+	// (re)allocate buffer
+	if (m_info.capacity < n_bytes) {
+		// clean up old memory
+		if (m_info.handle != VK_NULL_HANDLE)
+			destroy();
+
+		// allocate new buffer
+		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true))
+			return false;
+	}
+
+
+	// memcpy host to device
+	if (!memory::memcpy_host_to_device(m_info.memory, indices, n_bytes)) {
+		destroy();
+		return false;
+	}
+	m_size = n_bytes;
+	return true;
+}
+
