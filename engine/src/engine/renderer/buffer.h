@@ -8,23 +8,15 @@
 
 class memory {
 public:
-	static VkDeviceMemory allocate_host_visible(size_t size, uint32_t memory_type_bits = 0);
-	static VkDeviceMemory allocate_device_visible(size_t size, uint32_t memory_type_bits = 0);
 
-	static bool memcpy_host_to_device(VkDeviceMemory memory, const void* data, size_t size);
+	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size);
 
-
-	static void free(VkDeviceMemory memory);
-private:
-
-	static bool s_initialized_types;
-	static void init();
 };
 
 struct buffer_info {
-	buffer_info() : capacity(0), memory(VK_NULL_HANDLE), handle(VK_NULL_HANDLE) {}
+	buffer_info() : capacity(0), memory{}, handle(VK_NULL_HANDLE) {}
 	size_t capacity;
-	VkDeviceMemory memory;
+	allocator::sub_allocation memory;
 	VkMemoryRequirements memory_requirements;
 
 	VkBuffer handle;

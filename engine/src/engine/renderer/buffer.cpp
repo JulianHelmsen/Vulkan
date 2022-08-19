@@ -2,124 +2,39 @@
 #include "context.h"
 #include <assert.h>
 
-bool memory::s_initialized_types = false;
-#define INVALID_TYPE_IDX (0xFFFFFFFF)
-
-
-static struct {
-	VkPhysicalDeviceMemoryProperties properties;
-	VkDeviceSize nonCoherentAtomSize;
-
-	
-}s_info;
-
-void memory::init() {
-	
-	vkGetPhysicalDeviceMemoryProperties(context::get_physical_device(), &s_info.properties);
+bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size) {
 	VkPhysicalDeviceProperties props;
 	vkGetPhysicalDeviceProperties(context::get_physical_device(), &props);
-	s_info.nonCoherentAtomSize = props.limits.nonCoherentAtomSize;
 
-	s_initialized_types = true;
-}
-
-
-
-static uint32_t get_memory_type_index(VkMemoryPropertyFlags required_flag_bits, uint32_t memory_requirment_type_bits) {
-	for (uint32_t type_idx = 0; type_idx < s_info.properties.memoryTypeCount; type_idx++) {
-		bool required_type = ((1 << type_idx) & memory_requirment_type_bits) != 0;
-		const auto& type = s_info.properties.memoryTypes[type_idx];
-		if ((type.propertyFlags & required_flag_bits) == required_flag_bits)
-			return type_idx;
-
-	}
-	return INVALID_TYPE_IDX;
-}
-
-VkDeviceMemory memory::allocate_host_visible(size_t size, uint32_t memory_type) {
-	if (!s_initialized_types)
-		init();
-
-	VkMemoryAllocateInfo allocate_info = { };
-	allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocate_info.pNext = NULL;
-	allocate_info.allocationSize = (VkDeviceSize)size;
-	allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, memory_type);
-	if(allocate_info.memoryTypeIndex == INVALID_TYPE_IDX)
-		allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, memory_type);
-	if (allocate_info.memoryTypeIndex == INVALID_TYPE_IDX)
-		return VK_NULL_HANDLE;
-
-
-	auto& type = s_info.properties.memoryTypes[allocate_info.memoryTypeIndex];
-	auto& heap = s_info.properties.memoryHeaps[type.heapIndex];
-
-	// currently not worrying about memory too much
-	assert(allocate_info.allocationSize < heap.size);
-
-	VkDeviceMemory memory;
-	if (vkAllocateMemory(context::get_device(), &allocate_info, NULL, &memory) != VK_SUCCESS)
-		return VK_NULL_HANDLE;
-	return memory;
-}
-
-VkDeviceMemory memory::allocate_device_visible(size_t size, uint32_t memory_type_bits) {
-	if (!s_initialized_types)
-		init();
-
-	VkMemoryAllocateInfo allocate_info = { };
-	allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocate_info.pNext = NULL;
-	allocate_info.allocationSize = (VkDeviceSize)size;
-	allocate_info.memoryTypeIndex = get_memory_type_index(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memory_type_bits);
-
-	auto& type = s_info.properties.memoryTypes[allocate_info.memoryTypeIndex];
-	auto& heap = s_info.properties.memoryHeaps[type.heapIndex];
-
-	// currently not worrying about memory too much
-	assert(allocate_info.allocationSize < heap.size);
-
-	VkDeviceMemory memory;
-	if (vkAllocateMemory(context::get_device(), &allocate_info, NULL, &memory) != VK_SUCCESS)
-		return VK_NULL_HANDLE;
-	return memory;
-}
-
-
-bool memory::memcpy_host_to_device(VkDeviceMemory memory, const void* data, size_t size) {
 	VkDeviceSize d_size = size;
-	if (size % s_info.nonCoherentAtomSize)
-		d_size = VK_WHOLE_SIZE;
+	d_size = align(size);
 
 	void* mapped;
-	if (vkMapMemory(context::get_device(), memory, 0, d_size, 0, &mapped) != VK_SUCCESS)
+	if (vkMapMemory(context::get_device(), memory.handle, memory.start_address, d_size, 0, &mapped) != VK_SUCCESS)
 		return false;
 	memcpy(mapped, data, size);
 	VkMappedMemoryRange range;
 	range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 	range.pNext = NULL;
-	range.memory = memory;
-	range.offset = 0;
+	range.memory = memory.handle;
+	range.offset = memory.start_address;
 	range.size = d_size;
 
 	if (vkFlushMappedMemoryRanges(context::get_device(), 1, &range) != VK_SUCCESS)
 		return false;
 
 
-	vkUnmapMemory(context::get_device(), memory);
+	vkUnmapMemory(context::get_device(), memory.handle);
 	return true;
 }
 
-void memory::free(VkDeviceMemory memory) {
-	vkFreeMemory(context::get_device(), memory, NULL);
-}
 
 
 bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage, bool host_visible) {
 	// initialize buffer info
 	info.capacity = 0;
 	info.handle = VK_NULL_HANDLE;
-	info.memory = VK_NULL_HANDLE;
+	info.memory = allocator::invalid_allocation;
 
 	// create the buffer handle
 	VkBufferCreateInfo create_info = { };
@@ -142,13 +57,13 @@ bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage,
 		capacity = info.memory_requirements.size;
 
 	// allocate memory
-	if(host_visible)
-		info.memory = memory::allocate_host_visible((VkDeviceSize)capacity, info.memory_requirements.memoryTypeBits);
-	else
-		info.memory = memory::allocate_device_visible((VkDeviceSize)capacity, info.memory_requirements.memoryTypeBits);
+	allocator& allocator = context::get_memory_allocator();
+	allocator::access_flags access = host_visible ? allocator::access_flags::DYNAMIC : allocator::access_flags::DYNAMIC;
+	allocator::sub_allocation sub_allocation = allocator.allocate(capacity, info.memory_requirements.memoryTypeBits, access);
+
 
 	// check for allocation errors
-	if (info.memory == VK_NULL_HANDLE) {
+	if (!sub_allocation) {
 		// failed to allocate memory for this buffer
 		vkDestroyBuffer(context::get_device(), info.handle, NULL);
 		info.handle = VK_NULL_HANDLE;
@@ -157,11 +72,11 @@ bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage,
 	}
 
 	// bind the allocated memory to the buffer
-	if (vkBindBufferMemory(context::get_device(), info.handle, info.memory, 0) != VK_SUCCESS) {
+	if (vkBindBufferMemory(context::get_device(), info.handle, sub_allocation.handle, sub_allocation.start_address) != VK_SUCCESS) {
 		// failed to bind memory to buffer
-		vkFreeMemory(context::get_device(), info.memory, NULL);
+		allocator.free(sub_allocation);
 		vkDestroyBuffer(context::get_device(), info.handle, NULL);
-		info.memory = VK_NULL_HANDLE;
+		info.memory = allocator::invalid_allocation;
 		info.handle = VK_NULL_HANDLE;
 		info.capacity = 0;
 		return false;
@@ -169,6 +84,7 @@ bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage,
 
 	// set buffer size
 	info.capacity = capacity;
+	info.memory = sub_allocation;
 	// buffer creation, memory allocation and binding was successfull
 	return true;
 }
@@ -185,9 +101,10 @@ std::shared_ptr<vertex_buffer> vertex_buffer::create() {
 void vertex_buffer::destroy() {
 	if(m_info.handle != VK_NULL_HANDLE)
 		vkDestroyBuffer(context::get_device(), m_info.handle, NULL);
-	if(m_info.memory != VK_NULL_HANDLE)
-		memory::free(m_info.memory);
-	m_info.memory = VK_NULL_HANDLE;
+	allocator& allocator = context::get_memory_allocator();
+	if (m_info.memory)
+		allocator.free(m_info.memory);
+	m_info.memory = allocator::invalid_allocation;
 	m_info.handle = VK_NULL_HANDLE;
 	m_info.capacity = 0;
 }
@@ -195,9 +112,10 @@ void vertex_buffer::destroy() {
 void index_buffer::destroy() {
 	if (m_info.handle != VK_NULL_HANDLE)
 		vkDestroyBuffer(context::get_device(), m_info.handle, NULL);
-	if (m_info.memory != VK_NULL_HANDLE)
-		memory::free(m_info.memory);
-	m_info.memory = VK_NULL_HANDLE;
+	allocator& allocator = context::get_memory_allocator();
+	if (m_info.memory)
+		allocator.free(m_info.memory);
+	m_info.memory = allocator::invalid_allocation;
 	m_info.handle = VK_NULL_HANDLE;
 	m_info.capacity = 0;
 }
@@ -208,7 +126,7 @@ bool vertex_buffer::set_buffer_data(const void* data, size_t n_bytes) {
 	// (re)allocate buffer
 	if(m_info.capacity < n_bytes) {
 		// clean up old memory
-		if (m_info.handle != VK_NULL_HANDLE)
+		if (m_info.handle)
 			destroy();
 
 		// allocate new buffer
@@ -228,7 +146,7 @@ bool index_buffer::set_buffer_data(const uint32_t* indices, size_t n_bytes) {
 	// (re)allocate buffer
 	if (m_info.capacity < n_bytes) {
 		// clean up old memory
-		if (m_info.handle != VK_NULL_HANDLE)
+		if (m_info.handle)
 			destroy();
 
 		// allocate new buffer

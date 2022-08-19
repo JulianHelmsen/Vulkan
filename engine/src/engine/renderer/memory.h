@@ -5,6 +5,9 @@
 #include <vector>
 #include <array>
 
+#define ALIGNMENT (256)
+VkDeviceSize align(VkDeviceSize size);
+
 class allocator {
 public:
 
@@ -41,7 +44,6 @@ public:
 
 private:
 	VkDevice m_device;
-	VkDeviceSize m_alignment = 128;
 	VkDeviceSize m_default_allocation_size = 1 << 28;
 	bool m_initialized;
 
@@ -75,7 +77,6 @@ private:
 	
 
 	bool find_space(memory_block* space, size_t* index, const memory& memory, size_t size);
-	VkDeviceSize align(VkDeviceSize size);
 
 	void print_memory_leaks();
 

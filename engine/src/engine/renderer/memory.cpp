@@ -78,11 +78,11 @@ allocator::sub_allocation allocator::sub_allocate(memory& memory, size_t size) {
 }
 
 
-VkDeviceSize allocator::align(VkDeviceSize size) {
-	VkDeviceSize mod = size % m_alignment;
-	VkDeviceSize to_add = m_alignment - mod;
+VkDeviceSize align(VkDeviceSize size) {
+	VkDeviceSize mod = size % ALIGNMENT;
+	VkDeviceSize to_add = ALIGNMENT - mod;
 
-	assert((to_add + size) % m_alignment == 0);
+	assert((to_add + size) % ALIGNMENT == 0);
 	return size + to_add;
 }
 
@@ -92,7 +92,7 @@ bool allocator::initial_allocation(memory& memory) {
 	if (allocate_size > two_third_heap_size)
 		allocate_size = two_third_heap_size; // 66.66% of total heap size
 	allocate_size = align(allocate_size);
-	assert(allocate_size % m_alignment == 0);
+	assert(allocate_size % ALIGNMENT == 0);
 
 	VkMemoryAllocateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
