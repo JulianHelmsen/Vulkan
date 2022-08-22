@@ -21,6 +21,10 @@ void allocator::free(memory& memory, const sub_allocation& allocation) {
 		}
 	}
 
+	if (memory.blocks.size() == 0) {
+		free(memory);
+	}
+
 }
 
 
@@ -169,16 +173,21 @@ void allocator::free(const sub_allocation& allocation) {
 	if(allocation.memory_type_index != invalid_allocation.memory_type_index)
 		free(m_allocated_memory_types[allocation.memory_type_index], allocation);
 }
+void allocator::free(memory& memory) {
+	if (memory.handle != VK_NULL_HANDLE) {
+		vkFreeMemory(m_device, memory.handle, NULL);
+		memory.handle = VK_NULL_HANDLE;
+		memory.size = 0;
+		memory.blocks.clear();
+	}
+}
 
 void allocator::destroy() {
 #ifdef DEBUG
 	print_memory_leaks();
 #endif //DEBUG
 	for (uint32_t i = 0; i < m_memory_type_count; i++) {
-		memory& mem_type = m_allocated_memory_types[i];
-		if(mem_type.handle != VK_NULL_HANDLE) {
-			vkFreeMemory(m_device, mem_type.handle, NULL);
-		}
+		free(m_allocated_memory_types[i]);
 	}
 }
 

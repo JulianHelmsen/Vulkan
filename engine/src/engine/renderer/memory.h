@@ -68,6 +68,7 @@ private:
 
 	sub_allocation sub_allocate(memory& memory, size_t size);
 	void free(memory& memory, const sub_allocation& allocation);
+	void free(memory& memory);
 	memory* find_memory_type(uint32_t memory_type_bits, access_flags access_flags);
 	static bool matches_type(const memory& memory, uint32_t memory_type_bits, access_flags flags);
 	bool initial_allocation(memory& memory);
