@@ -142,48 +142,18 @@ int main(const int argc, const char** argv) {
 
 	context::create_window_framebuffers(render_pass);
 
-	constexpr uint64_t aquire_image_timeout = (uint64_t)1e9;
-	VkSemaphore acquired_semaphore = create_semaphore();
-	VkFence acquired_fence = create_fence();
 	VkSemaphore finished_rendering_semaphore  = create_semaphore();
 	while (!window.is_closed_requsted()) {
-		vkResetFences(context::get_device(), 1, &acquired_fence);
-		uint32_t image_index;
-		if (vkAcquireNextImageKHR(context::get_device(), context::get_swapchain().swapchain, aquire_image_timeout, acquired_semaphore, acquired_fence, &image_index) == VK_TIMEOUT)
-			continue;
-		waitFence(acquired_fence, aquire_image_timeout);
-		command_buffer& to_execute = cmd_buffers[image_index];
 
+		// acquire the image from the swapchain
+		uint32_t image_index;
+		if (context::begin_frame(&image_index) == VK_TIMEOUT)
+			continue;
 
 		// execute command buffer
-		VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		cmd_buffers[image_index].submit(context::get_graphics_queue(), VK_NULL_HANDLE, finished_rendering_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-		VkSubmitInfo submit_info = {};
-		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submit_info.pNext = NULL;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &acquired_semaphore;
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitDstStageMask = &wait_stage;
-		submit_info.commandBufferCount = 1;
-		submit_info.pCommandBuffers = &to_execute.get_handle();
-		submit_info.signalSemaphoreCount = 1;
-		submit_info.pSignalSemaphores = &finished_rendering_semaphore;
-
-		vkQueueSubmit(context::get_graphics_queue(), 1, &submit_info, VK_NULL_HANDLE);
-
-
-		VkPresentInfoKHR present_info = {};
-		present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		present_info.pNext = NULL;
-		present_info.waitSemaphoreCount = 1;
-		present_info.pWaitSemaphores = &finished_rendering_semaphore;
-		present_info.swapchainCount = 1;
-		present_info.pSwapchains = &context::get_swapchain().swapchain;
-		present_info.pImageIndices = &image_index;
-		present_info.pResults = NULL;
-
-		VkResult present_result = vkQueuePresentKHR(context::get_graphics_queue(), &present_info);
+		VkResult present_result = context::end_frame(finished_rendering_semaphore);
 		if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
 			while (window.is_minimized() && !window.is_closed_requsted())
 				window.wait_events();
@@ -195,11 +165,9 @@ int main(const int argc, const char** argv) {
 		window.poll_events();
 	}
 
-
+	staging_buf->destroy();
 	ibo->destroy();
 	vbo->destroy();
-	vkDestroyFence(context::get_device(), acquired_fence, NULL);
-	vkDestroySemaphore(context::get_device(), acquired_semaphore, NULL);
 	vkDestroySemaphore(context::get_device(), finished_rendering_semaphore, NULL);
 	for(command_buffer& cmd_buffer : cmd_buffers)
 		cmd_buffer.destroy();

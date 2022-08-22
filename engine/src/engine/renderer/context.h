@@ -59,9 +59,15 @@ public:
 
 	static const queue_family_indices& get_queue_families() { return s_current->m_queue_family_indices; }
 
+	static VkResult begin_frame(uint32_t* image_index) { return s_current->begin_frame_impl(image_index); }
+
+	static VkResult end_frame(VkSemaphore wait_semaphore) { return s_current->end_frame_impl(wait_semaphore); }
+
 private:
 	bool recreate_swapchain_impl(VkRenderPass render_pass);
 
+	VkResult begin_frame_impl(uint32_t* image_index);
+	VkResult end_frame_impl(VkSemaphore wait_semaphore);
 
 	
 	bool init(window_handle_t handle);
@@ -91,6 +97,9 @@ private:
 	framebuffer* m_window_framebuffers = NULL;
 
 	allocator m_allocator;
+
+	uint32_t m_current_image_index;
+	VkFence m_acquired_fence;
 
 };
 
