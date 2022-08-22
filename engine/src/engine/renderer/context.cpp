@@ -1,7 +1,7 @@
 #include "context.h"
 #include "render_api.h"
 #include <vector>
-
+#include "synchronization.h"
 
 
 context* context::s_current = NULL;
@@ -32,6 +32,15 @@ bool context::init(window_handle_t handle) {
 
 	m_allocator.initialize(m_physical_device, m_device);
 
+
+	VkFenceCreateInfo create_info = { };
+	create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	create_info.pNext = NULL;
+	create_info.flags = 0;
+
+
+	if (vkCreateFence(m_device, &create_info, NULL, &m_acquired_fence) != VK_SUCCESS)
+		return false;
 
 	return true;
 }
@@ -289,6 +298,8 @@ context::~context() {
 	
 
 	delete[] m_window_framebuffers;
+
+	vkDestroyFence(m_device, m_acquired_fence, NULL);
 
 	m_allocator.destroy();
 

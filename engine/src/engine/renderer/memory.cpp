@@ -1,6 +1,7 @@
 #include "memory.h"
 #include <stdio.h>
 #include <assert.h>
+#include "context.h"
 
 allocator::sub_allocation allocator::invalid_allocation = {};
 
@@ -124,6 +125,7 @@ void allocator::initialize(VkPhysicalDevice physical_device, VkDevice device) {
 		mem.memory_type_info = properties.memoryTypes[i];
 		mem.heap_type_info = properties.memoryHeaps[mem.memory_type_info.heapIndex];
 
+
 		// initialize later:
 		mem.size = 0;
 		mem.handle = VK_NULL_HANDLE;
@@ -202,4 +204,30 @@ void allocator::print_memory_leaks() {
 			}
 		}
 	}
+}
+
+bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size) {
+	VkPhysicalDeviceProperties props;
+	vkGetPhysicalDeviceProperties(context::get_physical_device(), &props);
+
+	VkDeviceSize d_size = size;
+	d_size = align(size);
+
+	void* mapped;
+	if (vkMapMemory(context::get_device(), memory.handle, memory.start_address, d_size, 0, &mapped) != VK_SUCCESS)
+		return false;
+	memcpy(mapped, data, size);
+	VkMappedMemoryRange range;
+	range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+	range.pNext = NULL;
+	range.memory = memory.handle;
+	range.offset = memory.start_address;
+	range.size = d_size;
+
+	if (vkFlushMappedMemoryRanges(context::get_device(), 1, &range) != VK_SUCCESS)
+		return false;
+
+
+	vkUnmapMemory(context::get_device(), memory.handle);
+	return true;
 }

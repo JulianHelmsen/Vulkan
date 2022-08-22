@@ -2,31 +2,6 @@
 #include "context.h"
 #include <assert.h>
 
-bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size) {
-	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(context::get_physical_device(), &props);
-
-	VkDeviceSize d_size = size;
-	d_size = align(size);
-
-	void* mapped;
-	if (vkMapMemory(context::get_device(), memory.handle, memory.start_address, d_size, 0, &mapped) != VK_SUCCESS)
-		return false;
-	memcpy(mapped, data, size);
-	VkMappedMemoryRange range;
-	range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	range.pNext = NULL;
-	range.memory = memory.handle;
-	range.offset = memory.start_address;
-	range.size = d_size;
-
-	if (vkFlushMappedMemoryRanges(context::get_device(), 1, &range) != VK_SUCCESS)
-		return false;
-
-
-	vkUnmapMemory(context::get_device(), memory.handle);
-	return true;
-}
 
 
 
@@ -58,7 +33,7 @@ bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage,
 
 	// allocate memory
 	allocator& allocator = context::get_memory_allocator();
-	allocator::access_flags access = host_visible ? allocator::access_flags::DYNAMIC : allocator::access_flags::DYNAMIC;
+	allocator::access_flags access = host_visible ? allocator::access_flags::DYNAMIC : allocator::access_flags::STATIC;
 	allocator::sub_allocation sub_allocation = allocator.allocate(capacity, info.memory_requirements.memoryTypeBits, access);
 
 
@@ -122,7 +97,7 @@ void index_buffer::destroy() {
 
 
 
-bool vertex_buffer::set_buffer_data(const void* data, size_t n_bytes) {
+bool vertex_buffer::set_buffer_data(command_buffer& cmd_buf, std::shared_ptr<staging_buffer> staging, const void* data, size_t n_bytes) {
 	// (re)allocate buffer
 	if(m_info.capacity < n_bytes) {
 		// clean up old memory
@@ -130,19 +105,16 @@ bool vertex_buffer::set_buffer_data(const void* data, size_t n_bytes) {
 			destroy();
 
 		// allocate new buffer
-		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true))
+		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, false))
 			return false;
 	}
 
 	// memcpy host to device
-	if (!memory::memcpy_host_to_device(m_info.memory, data, n_bytes)) {
-		destroy();
-		return false;
-	}
+	staging->cpy(cmd_buf, m_info.handle, 0, data, n_bytes);
 	m_size = n_bytes;
 	return true;
 }
-bool index_buffer::set_buffer_data(const uint32_t* indices, size_t n_bytes) {
+bool index_buffer::set_buffer_data(command_buffer& cmd_buf, std::shared_ptr<staging_buffer> staging, const uint32_t* indices, size_t n_bytes) {
 	// (re)allocate buffer
 	if (m_info.capacity < n_bytes) {
 		// clean up old memory
@@ -150,17 +122,50 @@ bool index_buffer::set_buffer_data(const uint32_t* indices, size_t n_bytes) {
 			destroy();
 
 		// allocate new buffer
-		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true))
+		if (!create_buffer(m_info, n_bytes, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, false))
 			return false;
 	}
 
 
 	// memcpy host to device
-	if (!memory::memcpy_host_to_device(m_info.memory, indices, n_bytes)) {
-		destroy();
-		return false;
-	}
+	staging->cpy(cmd_buf, m_info.handle, 0, indices, n_bytes);
 	m_size = n_bytes;
 	return true;
 }
 
+std::shared_ptr<staging_buffer> staging_buffer::create() {
+
+	std::shared_ptr<staging_buffer> staging = std::make_shared<staging_buffer>();
+	size_t n_bytes = 1 << 20;
+	if (!create_buffer(staging->m_info, n_bytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, true))
+		return NULL;
+
+	staging->m_size = n_bytes;
+
+	return staging;
+}
+
+void staging_buffer::destroy() {
+	if (m_info.handle != VK_NULL_HANDLE)
+		vkDestroyBuffer(context::get_device(), m_info.handle, NULL);
+	allocator& allocator = context::get_memory_allocator();
+	if (m_info.memory)
+		allocator.free(m_info.memory);
+	m_info.memory = allocator::invalid_allocation;
+	m_info.handle = VK_NULL_HANDLE;
+	m_info.capacity = 0;
+}
+
+void staging_buffer::cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size) {
+	if (size == 0)
+		return;
+	memory::memcpy_host_to_device(m_info.memory, data, size);
+
+
+	VkBufferCopy cpy {};
+	cpy.srcOffset = 0;
+	cpy.dstOffset = 0;
+	cpy.size = size;
+
+	vkCmdCopyBuffer(cmd_buf.get_handle(), m_info.handle, dest, 1, &cpy);
+}

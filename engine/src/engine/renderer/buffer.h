@@ -4,14 +4,9 @@
 #include <vulkan/vulkan.h>
 #include <memory>
 #include "memory.h"
+#include "command_buffer.h"
 
 
-class memory {
-public:
-
-	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size);
-
-};
 
 struct buffer_info {
 	buffer_info() : capacity(0), memory{}, handle(VK_NULL_HANDLE) {}
@@ -24,6 +19,22 @@ struct buffer_info {
 
 bool create_buffer(buffer_info& info, size_t capacity, VkBufferUsageFlags usage, bool host_visible = false);
 
+class staging_buffer {
+public:
+	static std::shared_ptr<staging_buffer> create();
+
+	void destroy();
+
+
+	void cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size);
+
+	~staging_buffer() { destroy(); }
+private:
+
+	buffer_info m_info{};
+	size_t m_size;
+};
+
 
 class vertex_buffer {
 public:
@@ -31,7 +42,7 @@ public:
 	~vertex_buffer() { destroy(); }
 	void destroy();
 
-	bool set_buffer_data(const void* data, size_t n_bytes);
+	bool set_buffer_data(command_buffer& cmd_buf, std::shared_ptr<staging_buffer> staging, const void* data, size_t n_bytes);
 	const VkBuffer& get_handle() { return m_info.handle; }
 private:
 
@@ -47,7 +58,7 @@ public:
 	~index_buffer() { destroy(); }
 	void destroy();
 
-	bool set_buffer_data(const uint32_t* indices, size_t n_bytes);
+	bool set_buffer_data(command_buffer& cmd_buf, std::shared_ptr<staging_buffer> staging, const uint32_t* indices, size_t n_bytes);
 
 	const VkBuffer& get_handle() { return m_info.handle; }
 	const uint32_t index_count() const { return (uint32_t)m_size / sizeof(uint32_t); }

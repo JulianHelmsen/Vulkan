@@ -84,4 +84,11 @@ private:
 	
 };
 
+class memory {
+public:
+
+	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size);
+
+};
+
 #endif //ENGINE_RENDERER_MEMORY_H

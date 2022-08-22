@@ -28,3 +28,19 @@ bool command_buffer::end() {
 void command_buffer::destroy() {
 	vkFreeCommandBuffers(context::get_device(), context::get_command_pool(), 1, &m_handle);
 }
+
+void command_buffer::submit(VkQueue queue, VkSemaphore wait_semaphore, VkSemaphore signal, VkPipelineStageFlags wait_stage) {
+	VkPipelineStageFlags wait_stages = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.pNext = NULL;
+	submit_info.waitSemaphoreCount = wait_semaphore != VK_NULL_HANDLE;
+	submit_info.pWaitSemaphores = &wait_semaphore;
+	submit_info.pWaitDstStageMask = &wait_stages;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &m_handle;
+	submit_info.signalSemaphoreCount = signal != VK_NULL_HANDLE;
+	submit_info.pSignalSemaphores = &signal;
+
+	vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+}
