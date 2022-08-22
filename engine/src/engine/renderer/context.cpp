@@ -357,7 +357,7 @@ VkResult context::begin_frame_impl(uint32_t* image_index) {
 
 	constexpr uint64_t aquire_image_timeout = (uint64_t)1e9;
 	vkResetFences(context::get_device(), 1, &m_acquired_fence);
-	VkResult res = vkAcquireNextImageKHR(context::get_device(), context::get_swapchain().swapchain, aquire_image_timeout, 
+	VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain.swapchain, aquire_image_timeout, 
 		VK_NULL_HANDLE, m_acquired_fence, &m_current_image_index);
 
 	if (res == VK_TIMEOUT)
@@ -377,7 +377,7 @@ VkResult context::end_frame_impl(VkSemaphore wait_semaphore) {
 	present_info.waitSemaphoreCount = 1;
 	present_info.pWaitSemaphores = &wait_semaphore;
 	present_info.swapchainCount = 1;
-	present_info.pSwapchains = &context::get_swapchain().swapchain;
+	present_info.pSwapchains = &m_swapchain.swapchain;
 	present_info.pImageIndices = &m_current_image_index;
 	present_info.pResults = NULL;
 

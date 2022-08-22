@@ -15,6 +15,7 @@
 #include "renderer/command_buffer.h"
 #include "renderer/synchronization.h"
 #include "renderer/buffer.h"
+#include "renderer/memory.h"
 
 
 #define stack_array_len(arr) (sizeof(arr) / sizeof(arr[0]))
