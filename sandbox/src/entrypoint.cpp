@@ -73,7 +73,7 @@ class sandbox_app : public application {
 		render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		render_pass_begin_info.pNext = NULL;
 		render_pass_begin_info.renderPass = m_render_pass;
-		render_pass_begin_info.framebuffer = context::get_window_framebuffer(context::current_image_index()).get_handle();
+		render_pass_begin_info.framebuffer = context::get_current_framebuffer().get_handle();
 		render_pass_begin_info.clearValueCount = 1;
 		render_pass_begin_info.pClearValues = &clear_value;
 		render_pass_begin_info.renderArea.offset = { 0, 0 };
@@ -151,7 +151,7 @@ private:
 	};
 };
 
-extern application* create_app() {
+application* create_app() {
 	return new sandbox_app;
 }
 

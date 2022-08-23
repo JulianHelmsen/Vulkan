@@ -53,7 +53,7 @@ public:
 	static bool recreate_swapchain(VkRenderPass render_pass) { return s_current->recreate_swapchain_impl(render_pass); }
 	static bool create_window_framebuffers(VkRenderPass render_pass) { return s_current->create_window_framebuffers_impl(render_pass); }
 
-	static const framebuffer& get_window_framebuffer(uint32_t index) { return s_current->m_window_framebuffers[index]; }
+	static const framebuffer& get_current_framebuffer() { return s_current->m_window_framebuffers[s_current->m_current_image_index]; }
 
 	static void set_framebuffer_change_callback(framebuffer_change_callback callback) { s_current->m_framebuffer_change_callback = callback; }
 
