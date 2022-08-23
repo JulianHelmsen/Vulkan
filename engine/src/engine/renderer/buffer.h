@@ -26,13 +26,15 @@ public:
 	void destroy();
 
 
-	void cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size);
+	bool cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size);
+	void reset() { m_offset = 0; }
 
 	~staging_buffer() { destroy(); }
 private:
 
 	buffer_info m_info{};
 	size_t m_size;
+	size_t m_offset;
 };
 
 

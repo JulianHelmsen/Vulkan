@@ -87,7 +87,8 @@ private:
 class memory {
 public:
 
-	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size);
+	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size) { return memcpy_host_to_device(memory, 0, data, size); }
+	static bool memcpy_host_to_device(const allocator::sub_allocation& memory, size_t offset, const void* data, size_t size);
 
 };
 

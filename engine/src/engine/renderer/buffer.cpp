@@ -156,16 +156,22 @@ void staging_buffer::destroy() {
 	m_info.capacity = 0;
 }
 
-void staging_buffer::cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size) {
+bool staging_buffer::cpy(command_buffer& cmd_buf, VkBuffer dest, VkDeviceAddress offset, const void* data, VkDeviceSize size) {
 	if (size == 0)
-		return;
-	memory::memcpy_host_to_device(m_info.memory, data, size);
+		return true;
+	if (m_size < m_offset + size)
+		return false;
+	if (!memory::memcpy_host_to_device(m_info.memory, m_offset, data, size))
+		return false;
+	
 
 
 	VkBufferCopy cpy {};
-	cpy.srcOffset = 0;
+	cpy.srcOffset = m_offset;
 	cpy.dstOffset = 0;
 	cpy.size = size;
+	m_offset = align(m_offset + size);
 
 	vkCmdCopyBuffer(cmd_buf.get_handle(), m_info.handle, dest, 1, &cpy);
+	return true;
 }

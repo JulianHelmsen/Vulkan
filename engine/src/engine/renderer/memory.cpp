@@ -206,7 +206,7 @@ void allocator::print_memory_leaks() {
 	}
 }
 
-bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, const void* data, size_t size) {
+bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, size_t offset, const void* data, size_t size) {
 	VkPhysicalDeviceProperties props;
 	vkGetPhysicalDeviceProperties(context::get_physical_device(), &props);
 
@@ -214,14 +214,14 @@ bool memory::memcpy_host_to_device(const allocator::sub_allocation& memory, cons
 	d_size = align(size);
 
 	void* mapped;
-	if (vkMapMemory(context::get_device(), memory.handle, memory.start_address, d_size, 0, &mapped) != VK_SUCCESS)
+	if (vkMapMemory(context::get_device(), memory.handle, memory.start_address + offset, d_size, 0, &mapped) != VK_SUCCESS)
 		return false;
 	memcpy(mapped, data, size);
 	VkMappedMemoryRange range;
 	range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 	range.pNext = NULL;
 	range.memory = memory.handle;
-	range.offset = memory.start_address;
+	range.offset = memory.start_address + offset;
 	range.size = d_size;
 
 	if (vkFlushMappedMemoryRanges(context::get_device(), 1, &range) != VK_SUCCESS)

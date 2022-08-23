@@ -62,21 +62,16 @@ int main(const int argc, const char** argv) {
 	std::shared_ptr<staging_buffer> staging_buf = staging_buffer::create();
 	std::shared_ptr<vertex_buffer> vbo = vertex_buffer::create();
 	std::shared_ptr<index_buffer> ibo = index_buffer::create();
+	staging_buf->reset();
 	{
 		transfer_cmd_buf.start();
 		vbo->set_buffer_data(transfer_cmd_buf, staging_buf, data, sizeof(data));
+		ibo->set_buffer_data(transfer_cmd_buf, staging_buf, indices, sizeof(indices));
 		transfer_cmd_buf.end();
 		transfer_cmd_buf.submit(context::get_graphics_queue());
 		vkQueueWaitIdle(context::get_graphics_queue());
 	}
 
-	{
-		transfer_cmd_buf.start();
-		ibo->set_buffer_data(transfer_cmd_buf, staging_buf, indices, sizeof(indices));
-		transfer_cmd_buf.end();
-		transfer_cmd_buf.submit(context::get_graphics_queue(), VK_NULL_HANDLE);
-		vkQueueWaitIdle(context::get_graphics_queue());
-	}
 	
 	transfer_cmd_buf.destroy();
 
