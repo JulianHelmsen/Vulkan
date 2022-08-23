@@ -11,7 +11,7 @@ public:
 		: m_render_pass(render_pass), m_buffer_layout_stride(0), m_culling_enabled(VK_FALSE), m_depth_test(VK_FALSE), m_stencil_test(VK_FALSE), m_blending(VK_FALSE), m_samples(1) {
 	}
 
-	VkPipeline build();
+	void build(VkPipeline* pipeline, VkPipelineLayout* layout);
 
 	void buffer_layout_push_floats(uint32_t count);
 
@@ -28,7 +28,14 @@ public:
 
 	void set_sample_count(int samples) { m_samples = samples; }
 
+	
+	template<typename T>
+	void push_constant(VkShaderStageFlags shader_stage, size_t offset) {
+		push_constant(shader_stage, offset, sizeof(T));
+	}
 
+	void push_constant(VkShaderStageFlags shader_stage, size_t offset, size_t size);
+	
 
 private:
 	std::vector<VkPipelineShaderStageCreateInfo> m_shader_stages;
@@ -58,6 +65,12 @@ private:
 	std::vector<buffer_layout_element> m_buffer_layout;
 	uint32_t m_buffer_layout_stride;
 	static VkFormat convert_to_vk_format(data_type type, uint32_t count);
+	VkResult create_pipeline_layout(VkPipelineLayout* layout);
+
+
+
+	std::vector<VkPushConstantRange> m_push_constant_ranges;
+
 };
 
 

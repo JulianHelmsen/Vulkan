@@ -2,12 +2,13 @@
 #include <engine/engine.h>
 #include <stdio.h>
 #include <assert.h>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/glm.hpp>
 
 
 
 
 int main(const int argc, const char** argv) {
-	
 	// create the window
 	window window{"Title", 1020, 720};
 
@@ -35,8 +36,14 @@ int main(const int argc, const char** argv) {
 
 	VkRenderPass render_pass = render_pass_builder.build();
 
+	struct p_constant {
+		glm::mat4 view_projection_matrix;
+		glm::mat4 model_matrix;
+	};
 
 	// create the graphics pipeline
+	VkPipeline pipeline;
+	VkPipelineLayout layout;
 	pipeline_builder pipeline_builder{render_pass};
 	pipeline_builder.buffer_layout_push_floats(3);
 	VkShaderModule vertex = shader::load_module_from_file("res/vertex.spv");
@@ -45,7 +52,8 @@ int main(const int argc, const char** argv) {
 	pipeline_builder.set_viewport(0.0f, 0.0f, (float) swapchain_extent.width, (float)swapchain_extent.height);
 	pipeline_builder.set_vertex_shader(vertex);
 	pipeline_builder.set_fragment_shader(fragment);
-	VkPipeline pipeline = pipeline_builder.build();
+	pipeline_builder.push_constant<p_constant>(VK_SHADER_STAGE_VERTEX_BIT, 0);
+	pipeline_builder.build(&pipeline, &layout);
 	
 	vkDestroyShaderModule(context::get_device(), vertex, NULL);
 	vkDestroyShaderModule(context::get_device(), fragment, NULL);
@@ -83,6 +91,9 @@ int main(const int argc, const char** argv) {
 	// record command buffers
 	command_buffer cmd_buffers[2];
 	context::set_framebuffer_change_callback([&]() -> void {
+
+		static float v = 1.0f;
+		v *= 0.9f;
 		for (int i = 0; i < stack_array_len(cmd_buffers); i++) {
 			command_buffer& cmd_buf = cmd_buffers[i];
 			cmd_buf.start();
@@ -104,6 +115,15 @@ int main(const int argc, const char** argv) {
 			vkCmdBeginRenderPass(cmd_buf.get_handle(), &render_pass_begin_info, contents);
 			vkCmdBindPipeline(cmd_buf.get_handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+			
+			p_constant constants;
+			glm::mat4 projection_matrix = glm::mat4(1.0f);
+			projection_matrix[1][1] = -projection_matrix[1][1];
+			glm::mat4 view_matrix = glm::mat4(1.0f);
+			constants.model_matrix = glm::mat4(1.0f);
+			constants.view_projection_matrix = projection_matrix * view_matrix;
+
+			vkCmdPushConstants(cmd_buf.get_handle(), layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(constants), &constants);
 
 			vkCmdBindIndexBuffer(cmd_buf.get_handle(), ibo->get_handle(), 0, VK_INDEX_TYPE_UINT32);
 			vkCmdBindVertexBuffers(cmd_buf.get_handle(), 0, 1, &vbo->get_handle(), &offset);
@@ -148,8 +168,7 @@ int main(const int argc, const char** argv) {
 		// execute command buffer
 		cmd_buffers[image_index].submit(context::get_graphics_queue(), VK_NULL_HANDLE, finished_rendering_semaphore, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-		VkResult present_result = context::end_frame(finished_rendering_semaphore);
-		if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+		if (context::end_frame(finished_rendering_semaphore) == VK_ERROR_OUT_OF_DATE_KHR) {
 			while (window.is_minimized() && !window.is_closed_requsted())
 				window.wait_events();
 			context::recreate_swapchain(render_pass);
@@ -166,6 +185,7 @@ int main(const int argc, const char** argv) {
 	vkDestroySemaphore(context::get_device(), finished_rendering_semaphore, NULL);
 	for(command_buffer& cmd_buffer : cmd_buffers)
 		cmd_buffer.destroy();
+	vkDestroyPipelineLayout(context::get_device(), layout, NULL);
 	vkDestroyPipeline(context::get_device(), pipeline, NULL);
 	vkDestroyRenderPass(context::get_device(), render_pass, NULL);
 	delete ctx;

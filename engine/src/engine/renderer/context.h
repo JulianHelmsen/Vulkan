@@ -101,6 +101,7 @@ private:
 	uint32_t m_current_image_index;
 	VkFence m_acquired_fence;
 
+
 };
 
 #endif //ENGINE_RENDERER_CONTEXT_H

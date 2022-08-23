@@ -65,10 +65,9 @@ void pipeline_builder::set_geometry_shader(VkShaderModule geometry_module) {
 	init_shader_stage_create_info(info, VK_SHADER_STAGE_GEOMETRY_BIT, geometry_module);
 }
 
-VkPipeline pipeline_builder::build() {
+void pipeline_builder::build(VkPipeline* pipeline, VkPipelineLayout* layout) {
 
 	VkResult result;
-	VkPipeline pipeline = VK_NULL_HANDLE;
 	VkGraphicsPipelineCreateInfo create_info = { };
 
 	char* vertex_buffer_description = (char*)malloc(m_buffer_layout.size() * (sizeof(VkVertexInputBindingDescription) + sizeof(VkVertexInputAttributeDescription)));
@@ -168,14 +167,6 @@ VkPipeline pipeline_builder::build() {
 	for(int i = 0; i < 4; i++)
 		color_blend_state.blendConstants[i] = 0.0f;
 
-	VkPipelineLayoutCreateInfo layout_create_info = { };
-	layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	layout_create_info.pNext = NULL;
-	layout_create_info.flags = 0;
-	layout_create_info.setLayoutCount = 0;
-	layout_create_info.pSetLayouts = NULL;
-	layout_create_info.pushConstantRangeCount = 0;
-	layout_create_info.pPushConstantRanges = NULL;
 
 	VkPipelineDynamicStateCreateInfo dynamic_state = {};
 	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -185,9 +176,9 @@ VkPipeline pipeline_builder::build() {
 	dynamic_state.pDynamicStates = states;
 	dynamic_state.dynamicStateCount = (uint32_t)sizeof(states) / sizeof(states[0]);
 
+
 	
-	VkPipelineLayout layout;
-	VkResult layout_result = vkCreatePipelineLayout(context::get_device(), &layout_create_info, NULL, &layout);
+	VkResult layout_result = create_pipeline_layout(layout);
 	if(layout_result != VK_SUCCESS) {
 		result = layout_result;
 		goto return_label;
@@ -212,17 +203,15 @@ VkPipeline pipeline_builder::build() {
 	create_info.pDepthStencilState = &depth_stencil_create_info;
 	create_info.pColorBlendState = &color_blend_state;
 	create_info.pDynamicState = &dynamic_state;
-	create_info.layout = layout;
+	create_info.layout = *layout;
 
 	// do not derive for now
 	create_info.basePipelineIndex = -1;
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	
-	result = vkCreateGraphicsPipelines(context::get_device(), VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline);
-	vkDestroyPipelineLayout(context::get_device(), layout, NULL);
+	result = vkCreateGraphicsPipelines(context::get_device(), VK_NULL_HANDLE, 1, &create_info, NULL, pipeline);
 return_label:
 	free(vertex_buffer_description);
-	return result == VK_SUCCESS ? pipeline : VK_NULL_HANDLE;
 }
 
 void pipeline_builder::init_vertex_input_state_create_info(VkVertexInputBindingDescription* bindings, VkVertexInputAttributeDescription* attributes) {
@@ -257,4 +246,30 @@ void pipeline_builder::set_viewport(float x, float y, float width, float height,
 	m_viewport.height = height;
 	m_viewport.minDepth = min_depth;
 	m_viewport.maxDepth = max_depth;
+}
+
+VkResult pipeline_builder::create_pipeline_layout(VkPipelineLayout* layout) {
+	
+
+	
+
+	VkPipelineLayoutCreateInfo layout_create_info = { };
+	layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layout_create_info.pNext = NULL;
+	layout_create_info.flags = 0;
+	layout_create_info.setLayoutCount = 0;
+	layout_create_info.pSetLayouts = NULL;
+	layout_create_info.pushConstantRangeCount = (uint32_t)m_push_constant_ranges.size();
+	layout_create_info.pPushConstantRanges = m_push_constant_ranges.data();
+
+	
+	return vkCreatePipelineLayout(context::get_device(), &layout_create_info, NULL, layout);
+}
+
+
+void pipeline_builder::push_constant(VkShaderStageFlags shader_stage, size_t offset, size_t size) {
+	VkPushConstantRange& range = m_push_constant_ranges.emplace_back();
+	range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	range.offset = (uint32_t) offset;
+	range.size = (uint32_t)size;
 }

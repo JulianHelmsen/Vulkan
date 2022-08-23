@@ -23,6 +23,7 @@ project "sandbox"
 	includedirs {
 		"engine/src",
 		"sandbox/src",
+		"thirdparty/glm",
 		"$(VULKAN_SDK)/include"
 	}
 
@@ -62,6 +63,7 @@ project "engine"
 	}
 
 	includedirs {
+		"thirdparty/glm",
 		"engine/src",
 		"$(VULKAN_SDK)/include"
 	}
