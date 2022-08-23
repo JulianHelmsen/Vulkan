@@ -29,7 +29,11 @@ void command_buffer::destroy() {
 	vkFreeCommandBuffers(context::get_device(), context::get_command_pool(), 1, &m_handle);
 }
 
-void command_buffer::submit(VkQueue queue, VkSemaphore wait_semaphore, VkSemaphore signal, VkPipelineStageFlags wait_stage) {
+VkResult command_buffer::reset() {
+	return vkResetCommandBuffer(m_handle, 0);
+}
+
+void command_buffer::submit(VkQueue queue, VkSemaphore wait_semaphore, VkSemaphore signal, VkFence fence, VkPipelineStageFlags wait_stage) {
 	VkPipelineStageFlags wait_stages = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
 	VkSubmitInfo submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -42,5 +46,5 @@ void command_buffer::submit(VkQueue queue, VkSemaphore wait_semaphore, VkSemapho
 	submit_info.signalSemaphoreCount = signal != VK_NULL_HANDLE;
 	submit_info.pSignalSemaphores = &signal;
 
-	vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+	vkQueueSubmit(queue, 1, &submit_info, fence);
 }

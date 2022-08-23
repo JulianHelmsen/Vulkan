@@ -63,6 +63,11 @@ public:
 
 	static VkResult end_frame(VkSemaphore wait_semaphore) { return s_current->end_frame_impl(wait_semaphore); }
 
+	static uint32_t current_image_index() { return s_current->m_current_image_index; }
+
+	static VkSemaphore get_acquired_semaphore() { return s_current->m_acquired_semaphore; }
+	static VkFence get_in_flight_fence() { return s_current->m_in_flight_fence; }
+
 private:
 	bool recreate_swapchain_impl(VkRenderPass render_pass);
 
@@ -99,7 +104,8 @@ private:
 	allocator m_allocator;
 
 	uint32_t m_current_image_index;
-	VkFence m_acquired_fence;
+	VkSemaphore m_acquired_semaphore = VK_NULL_HANDLE;
+	VkFence m_in_flight_fence = VK_NULL_HANDLE;
 
 
 };

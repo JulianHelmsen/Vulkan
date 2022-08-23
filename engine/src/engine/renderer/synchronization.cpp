@@ -34,3 +34,4 @@ VkFence create_fence() {
 VkResult waitFence(VkFence fence, uint64_t timeout) {
 	return vkWaitForFences(context::get_device(), 1, &fence, VK_TRUE, timeout);
 }
+

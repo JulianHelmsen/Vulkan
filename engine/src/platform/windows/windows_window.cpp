@@ -64,7 +64,9 @@ window::window(const char* title, int width, int height) : m_window_handle(0), m
 	const void* user_ptr = this;
 	WCHAR wtitle[100] = { 0 };
 	utils::convert_to_wstring(wtitle, sizeof(wtitle) / sizeof(wtitle[0]), title);
-	HWND window_handle = CreateWindowEx(WS_EX_ACCEPTFILES, cls.lpszClassName, wtitle, WS_OVERLAPPEDWINDOW, 0, 0, width, height, NULL, NULL, cls.hInstance, (LPVOID)user_ptr);
+	DWORD wStyle = WS_OVERLAPPEDWINDOW;
+	DWORD extended_style = WS_EX_ACCEPTFILES; // https://docs.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+	HWND window_handle = CreateWindowExW(extended_style, cls.lpszClassName, wtitle, wStyle, 0, 0, width, height, NULL, NULL, cls.hInstance, (LPVOID)user_ptr);
 	if (window_handle == NULL) {
 		m_closed = true;
 		return;
@@ -97,8 +99,10 @@ void window::wait_events() {
 
 
 void window::destroy() {
-	HWND hwnd = (HWND)m_window_handle;
-	DestroyWindow(hwnd);
-	m_window_handle = true;
-	m_closed = true;
+	if(m_window_handle != NULL) {
+		HWND hwnd = (HWND)m_window_handle;
+		DestroyWindow(hwnd);
+		m_window_handle = NULL;
+		m_closed = true;
+	}
 }

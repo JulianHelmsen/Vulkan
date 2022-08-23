@@ -38,8 +38,15 @@ bool context::init(window_handle_t handle) {
 	create_info.pNext = NULL;
 	create_info.flags = 0;
 
+	if (vkCreateFence(m_device, &create_info, NULL, &m_in_flight_fence) != VK_SUCCESS)
+		return false;
 
-	if (vkCreateFence(m_device, &create_info, NULL, &m_acquired_fence) != VK_SUCCESS)
+	VkSemaphoreCreateInfo semaphore_create_info{};
+	semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	semaphore_create_info.pNext = NULL;
+	semaphore_create_info.flags = 0;
+
+	if (vkCreateSemaphore(m_device, &semaphore_create_info, NULL, &m_acquired_semaphore) != VK_SUCCESS)
 		return false;
 
 	return true;
@@ -221,7 +228,7 @@ static VkPresentModeKHR select_present_mode(VkPhysicalDevice device, VkSurfaceKH
 		}
 	}
 	delete[] present_modes;
-	return selected;
+	return VK_PRESENT_MODE_FIFO_KHR;// selected;
 }
 
 bool context::create_swapchain() {
@@ -299,7 +306,10 @@ context::~context() {
 
 	delete[] m_window_framebuffers;
 
-	vkDestroyFence(m_device, m_acquired_fence, NULL);
+	if(m_acquired_semaphore != VK_NULL_HANDLE)
+		vkDestroySemaphore(m_device, m_acquired_semaphore, NULL);
+	if (m_in_flight_fence != VK_NULL_HANDLE)
+		vkDestroyFence(m_device, m_in_flight_fence, NULL);
 
 	m_allocator.destroy();
 
@@ -355,15 +365,15 @@ bool context::recreate_swapchain_impl(VkRenderPass render_pass) {
 
 VkResult context::begin_frame_impl(uint32_t* image_index) {
 
-	constexpr uint64_t aquire_image_timeout = (uint64_t)1e9;
-	vkResetFences(context::get_device(), 1, &m_acquired_fence);
-	VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain.swapchain, aquire_image_timeout, 
-		VK_NULL_HANDLE, m_acquired_fence, &m_current_image_index);
+	constexpr uint64_t wait_timeout = (uint64_t)1e9;
+	vkWaitForFences(m_device, 1, &m_in_flight_fence, VK_TRUE, wait_timeout);
+	VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain.swapchain, wait_timeout,
+		m_acquired_semaphore, VK_NULL_HANDLE, &m_current_image_index);
+	vkResetFences(m_device, 1, &m_in_flight_fence);
 
 	if (res == VK_TIMEOUT)
 		return res;
 
-	vkWaitForFences(context::get_device(), 1, &m_acquired_fence, VK_TRUE, aquire_image_timeout);
 
 	if (image_index)
 		*image_index = m_current_image_index;
@@ -374,8 +384,8 @@ VkResult context::end_frame_impl(VkSemaphore wait_semaphore) {
 	VkPresentInfoKHR present_info = {};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	present_info.pNext = NULL;
-	present_info.waitSemaphoreCount = 1;
-	present_info.pWaitSemaphores = &wait_semaphore;
+	present_info.waitSemaphoreCount = wait_semaphore != VK_NULL_HANDLE;
+	present_info.pWaitSemaphores = wait_semaphore != VK_NULL_HANDLE  ? &wait_semaphore : NULL;
 	present_info.swapchainCount = 1;
 	present_info.pSwapchains = &m_swapchain.swapchain;
 	present_info.pImageIndices = &m_current_image_index;
